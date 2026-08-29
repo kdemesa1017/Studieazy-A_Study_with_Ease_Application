@@ -1,15 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart';
 import '../services/local_user_store.dart';
+import '../services/otp_service.dart';
 import '../models/user_model.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 final localUserStoreProvider = Provider<LocalUserStore>(
   (ref) => LocalUserStore(),
 );
+final otpServiceProvider = Provider<OtpService>((ref) => OtpService());
 
 /// Exposes [UserModel?] as an [AsyncValue] so the UI can distinguish between:
 ///   - [AsyncLoading]      → Firebase Auth not yet resolved
@@ -21,6 +24,7 @@ final currentUserProvider =
 class AuthNotifier extends AsyncNotifier<UserModel?> {
   AuthService get _authService => ref.read(authServiceProvider);
   LocalUserStore get _localUserStore => ref.read(localUserStoreProvider);
+  OtpService get _otpService => ref.read(otpServiceProvider);
 
   @override
   Future<UserModel?> build() async {
@@ -33,7 +37,8 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
         final user = await _resolveAuthUser(fbUser);
         completer.complete(user);
       } else {
-        // Subsequent auth events (explicit sign-out, token refresh, etc.)
+        // Subsequent auth events (explicit sign-out, token refresh, a fresh
+        // sign-up, etc.)
         if (fbUser == null) {
           // Ignore transient nulls — only sign out when local session was cleared.
           final stillHasSession = await _localUserStore.hasActiveSession();
@@ -42,7 +47,14 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
           }
         } else {
           final user = await _restoreUser(fbUser);
-          state = AsyncData(user);
+          if (user != null && user.otpVerified) {
+            state = AsyncData(user);
+          }
+          // If otpVerified is false, this is a freshly created account
+          // still mid-registration (Firebase signs the account in
+          // immediately on creation, but we don't treat the app as
+          // "logged in" until the user finishes the OTP step). Do
+          // nothing here — finalizeAfterVerification() handles it.
         }
       }
     });
@@ -70,9 +82,18 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
   /// Resolves auth on startup. Firebase may briefly report no user while it
   /// reads the persisted session from disk — fall back to the local session
   /// marker so users are not sent to login unless they explicitly signed out.
+  ///
+  /// Also guards against cold-starting straight into an account that was
+  /// created but never finished OTP verification (e.g. user closed the app
+  /// mid-registration). The local cache is only ever populated for accounts
+  /// that completed verification, so it's a safe fallback here.
   Future<UserModel?> _resolveAuthUser(dynamic fbUser) async {
     if (fbUser != null) {
-      return _restoreUser(fbUser);
+      final user = await _restoreUser(fbUser);
+      if (user != null && user.otpVerified) {
+        return user;
+      }
+      return _localUserStore.readActiveUser();
     }
 
     return _localUserStore.readActiveUser();
@@ -84,11 +105,12 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
   ///   3. Fall back to building a minimal model from Firebase Auth data
   ///      so the user is NEVER kicked to login just because they are offline.
   Future<UserModel?> _restoreUser(dynamic fbUser) async {
+    if (fbUser.isAnonymous == true) return null;
     final uid = fbUser.uid as String;
 
     // Step 1: local cache
     final cachedUser = await _localUserStore.read(uid);
-    if (cachedUser != null) {
+    if (cachedUser != null && cachedUser.otpVerified) {
       // Show cached immediately, then try to refresh from Firestore.
       state = AsyncData(cachedUser);
     }
@@ -97,7 +119,7 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     try {
       final remoteUser = await _authService.getUserFromFirestore(uid);
       if (remoteUser != null) {
-        await _localUserStore.save(remoteUser);
+        if (remoteUser.otpVerified) await _localUserStore.save(remoteUser);
         return remoteUser;
       }
     } catch (_) {
@@ -117,6 +139,10 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
       email: email,
       name: displayName.isEmpty ? 'Student' : displayName,
       createdAt: DateTime.now(),
+      // Unknown offline — treat as verified rather than locking an
+      // established offline user out; Firestore will correct this once
+      // back online.
+      otpVerified: true,
     );
     // Do NOT save this minimal model — it will be overwritten by Firestore
     // the next time the user goes online.
@@ -143,11 +169,39 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
         gradeLevel: gradeLevel,
       );
       if (user == null) return 'Authentication failed. Please try again.';
-      state = AsyncData(user);
-      await _localUserStore.save(user);
+      // Don't set app state here — the account still needs OTP
+      // verification. Setting it now would let the router send the user
+      // straight to home before they ever see the OTP entry step.
       return null;
     } catch (e) {
-      return e.toString();
+      final message = e.toString();
+
+      // If the account already exists, this is most likely the same
+      // person retrying after their first OTP email failed to send
+      // (Firebase already created the account on the first attempt,
+      // even though the email step failed afterwards). Try resuming
+      // that in-progress registration instead of hard-failing.
+      if (message.contains('already exists')) {
+        try {
+          final existingUser = await _authService.signIn(
+            email: email,
+            password: password,
+          );
+          if (existingUser != null && !existingUser.otpVerified) {
+            // Same unfinished registration — don't set app state, just
+            // let the caller proceed to (re)send the OTP.
+            return null;
+          }
+          if (existingUser != null && existingUser.otpVerified) {
+            return 'An account with this email already exists. Please sign in instead.';
+          }
+        } catch (_) {
+          // Wrong password, or some other issue — fall through to the
+          // original error below.
+        }
+      }
+
+      return message;
     }
   }
 
@@ -173,6 +227,137 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     if (userId != null) await _localUserStore.clear(userId);
     await _authService.signOut();
     state = const AsyncData(null);
+  }
+
+  /// Generates and emails a 6-digit OTP code to [email] for the currently
+  /// signed-up (but not-yet-verified) Firebase user.
+  Future<String?> sendOtpCode({required String email}) async {
+    final uid = _authService.currentFirebaseUser?.uid;
+    if (uid == null) return 'No account found. Please try registering again.';
+    try {
+      await _otpService.sendOtp(uid: uid, email: email);
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  /// Checks [code] against the OTP stored for the currently signed-up user.
+  /// Returns true if correct, false if incorrect. Throws a user-facing
+  /// message string if the code is expired, missing, or attempts are used up.
+  Future<bool> verifyOtpCode(String code) async {
+    final uid = _authService.currentFirebaseUser?.uid;
+    if (uid == null) throw 'No account found. Please try registering again.';
+    final isValid = await _otpService.verifyOtp(uid: uid, enteredCode: code);
+    if (isValid) {
+      await _authService.markOtpVerified(uid);
+    }
+    return isValid;
+  }
+
+  /// Marks the user as fully signed in. Call this only after
+  /// [verifyOtpCode] has returned true — i.e. once the user has actually
+  /// entered the correct code during registration.
+  Future<void> finalizeAfterVerification() async {
+    final fbUser = _authService.currentFirebaseUser;
+    if (fbUser == null) return;
+    final user = await _restoreUser(fbUser);
+    if (user != null) {
+      state = AsyncData(user);
+      await _localUserStore.save(user);
+    }
+  }
+
+  /// Sends a Firebase password reset email to [email].
+  Future<String?> sendPasswordReset(String email) async {
+    try {
+      await _authService.sendPasswordResetEmail(email);
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  /// Generates and emails a 6-digit OTP code to [email] for Forgot Password flow.
+  Future<String?> sendForgotPasswordOtpCode({required String email}) async {
+    try {
+      final exists = await _authService.checkEmailExists(email);
+      if (!exists) {
+        return 'No user found with this email.';
+      }
+      await _otpService.sendForgotPasswordOtp(email: email);
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  /// Verifies [code] for Forgot Password flow and marks OTP as verified in Firestore.
+  Future<bool> verifyForgotPasswordOtpCode({
+    required String email,
+    required String code,
+  }) async {
+    final isValid = await _otpService.verifyForgotPasswordOtp(
+      email: email,
+      enteredCode: code,
+    );
+    return isValid;
+  }
+
+  /// Calls our Vercel serverless API to update the Firebase Auth password.
+  /// The API validates the OTP hash in Firestore using Firebase Admin SDK.
+  Future<String?> resetPasswordViaVercel({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      final uri = Uri.parse(
+          'https://vercelapi-blue.vercel.app/api/reset-password');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'otp': otp,
+          'newPassword': newPassword,
+        }),
+      );
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 && body['success'] == true) {
+        return null; // success
+      }
+      return (body['error'] as String?) ?? 'Something went wrong.';
+    } catch (e) {
+      return 'Network error. Please check your connection.';
+    }
+  }
+
+  /// Completes password reset in Firebase Auth with the action code (or link) and new password.
+  Future<String?> confirmPasswordReset({
+    required String codeOrLink,
+    required String newPassword,
+  }) async {
+    try {
+      final code = _extractOobCode(codeOrLink);
+      await _authService.confirmPasswordReset(code: code, newPassword: newPassword);
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  String _extractOobCode(String input) {
+    final trimmed = input.trim();
+    if (trimmed.contains('oobCode=')) {
+      try {
+        final uri = Uri.parse(trimmed);
+        return uri.queryParameters['oobCode'] ?? trimmed;
+      } catch (_) {
+        return trimmed;
+      }
+    }
+    return trimmed;
   }
 
   Future<String?> updateProfile({

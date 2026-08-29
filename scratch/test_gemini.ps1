@@ -1,5 +1,5 @@
 $json = '{"contents":[{"parts":[{"text":"Hello"}]}]}'
-$key = '..'
+$key = 'AQ.Ab8RN6J0ChBCTMqgrLKqih4PHHGLjbxLQdCt2OAh2NA84i7KhQ'
 $headers = @{ 'x-goog-api-key' = $key; 'Content-Type' = 'application/json' }
 
 foreach ($model in @('gemini-2.5-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-3.6-flash')) {

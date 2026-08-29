@@ -82,6 +82,7 @@ class AuthService {
           school: school,
           gradeLevel: gradeLevel,
           createdAt: DateTime.now(),
+          otpVerified: false,
         );
 
         await _firestore
@@ -122,6 +123,10 @@ class AuthService {
           email: email,
           name: result.user!.displayName ?? email.split('@')[0],
           createdAt: DateTime.now(),
+          // Accounts created before the OTP feature existed, or restored
+          // without a Firestore doc, are treated as already verified so
+          // existing users are not locked out.
+          otpVerified: true,
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -132,6 +137,60 @@ class AuthService {
 
   Future<void> signOut() async {
     await _auth.signOut();
+  }
+
+  /// Marks the given user's account as OTP-verified in Firestore.
+  /// Called only after confirms the entered code
+  /// is correct.
+  Future<void> markOtpVerified(String uid) async {
+    await _firestore.collection('users').doc(uid).set(
+      {'otpVerified': true},
+      SetOptions(merge: true),
+    ).timeout(const Duration(seconds: 10), onTimeout: () => throw 'Connection timed out.');
+  }
+
+  /// Checks if a user with the given [email] exists in Firestore.
+  Future<bool> checkEmailExists(String email) async {
+    try {
+      final cleanEmail = email.trim().toLowerCase();
+      final snap = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: cleanEmail)
+          .limit(1)
+          .get()
+          .timeout(
+            const Duration(seconds: 5),
+          );
+      if (snap.docs.isNotEmpty) return true;
+
+      final snapRaw = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email.trim())
+          .limit(1)
+          .get()
+          .timeout(
+            const Duration(seconds: 5),
+          );
+      return snapRaw.docs.isNotEmpty;
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        // Unauthenticated users may not query the users collection under Firestore rules.
+        // Return true to allow sending the password reset OTP.
+        return true;
+      }
+      rethrow;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Sends a Firebase password reset email to [email].
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthError(e);
+    }
   }
 
   /// Writes streak fields to Firestore without touching other profile data.
@@ -210,6 +269,7 @@ class AuthService {
           bio: bio,
           profileImageBase64: profileImageBase64,
           createdAt: DateTime.now(),
+          otpVerified: true,
         );
       }
 
@@ -233,6 +293,7 @@ class AuthService {
               fbUser?.displayName ??
               (fbUser?.email?.split('@').first ?? 'User'),
           'createdAt': DateTime.now().toIso8601String(),
+          'otpVerified': true,
           ...updates,
         };
         await _firestore
@@ -337,6 +398,18 @@ class AuthService {
     }
   }
 
+  /// Confirms password reset in Firebase Auth using the oobCode and sets the new password.
+  Future<void> confirmPasswordReset({
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _auth.confirmPasswordReset(code: code, newPassword: newPassword);
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthError(e);
+    }
+  }
+
   String _handleAuthError(FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':
@@ -356,6 +429,10 @@ class AuthService {
         return 'Email/password sign-in is not enabled for this project.';
       case 'too-many-requests':
         return 'Too many attempts. Please try again later.';
+      case 'expired-action-code':
+        return 'The password reset link/code has expired. Please request a new one.';
+      case 'invalid-action-code':
+        return 'Invalid reset link or code. Please check the email sent to your inbox.';
       default:
         return 'Authentication failed. Please try again.';
     }

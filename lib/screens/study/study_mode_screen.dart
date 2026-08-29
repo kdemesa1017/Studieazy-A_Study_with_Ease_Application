@@ -5,6 +5,14 @@ import '../../providers/auth_provider.dart';
 import '../../providers/quiz_provider.dart';
 import '../../models/quiz_model.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/responsive_layout.dart';
+
+// ── Design Tokens (mirror home_screen.dart tokens) ────────────────────────────
+const _kCard   = Color(0xFF1E293B);
+const _kBorder = Color(0xFF334155);
+const _kGreen  = Color(0xFF22C55E);
+const _kPurple = Color(0xFF8B5CF6);
+const _kIndigo = Color(0xFF6366F1);
 
 class StudyModeScreen extends ConsumerWidget {
   const StudyModeScreen({super.key});
@@ -12,14 +20,10 @@ class StudyModeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
-
-    // Show skeleton while auth is still initialising
     if (userAsync.isLoading) return const PageSkeleton(list: true);
 
     final user = userAsync.valueOrNull;
-    if (user == null) {
-      return const PageSkeleton(list: true);
-    }
+    if (user == null) return const PageSkeleton(list: true);
 
     final quizzesAsync = ref.watch(userQuizzesProvider(user.id));
 
@@ -30,24 +34,20 @@ class StudyModeScreen extends ConsumerWidget {
         return _buildContent(context, quizzes, quizzesWithQuestions);
       },
       loading: () => const PageSkeleton(list: true),
-      error:
-          (e, _) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Error loading quizzes: $e'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed:
-                      () =>
-                          ref
-                              .read(userQuizzesProvider(user.id).notifier)
-                              .refreshQuizzes(),
-                  child: const Text('Retry'),
-                ),
-              ],
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Error loading quizzes: $e'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () =>
+                  ref.read(userQuizzesProvider(user.id).notifier).refreshQuizzes(),
+              child: const Text('Retry'),
             ),
-          ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -56,284 +56,147 @@ class StudyModeScreen extends ConsumerWidget {
     List<QuizModel> quizzes,
     List<QuizModel> quizzesWithQuestions,
   ) {
+    final studiedCount = quizzes.fold<int>(0, (s, q) => s + (q.studyCount ?? 0));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+    final maxWidth = isDesktop ? 820.0 : double.infinity;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).colorScheme.primary,
-                  Theme.of(context).colorScheme.secondary,
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Study Mode',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Choose a quiz to start studying',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Study Stats
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  context,
-                  icon: Icons.folder_outlined,
-                  title: 'Available',
-                  value: '${quizzesWithQuestions.length}',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard(
-                  context,
-                  icon: Icons.school_outlined,
-                  title: 'Studied',
-                  value:
-                      '${quizzes.fold<int>(0, (sum, q) => sum + (q.studyCount ?? 0))}',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Study Modes Info
-          Text(
-            'Study Modes',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildModeCard(
-                  context,
-                  icon: Icons.flip,
-                  title: 'Flashcards',
-                  description: 'Flip cards to test your memory',
-                  color: Colors.orange,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildModeCard(
-                  context,
-                  icon: Icons.quiz,
-                  title: 'Quiz Mode',
-                  description: 'Multiple choice questions with scoring',
-                  color: Colors.green,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-
-          // Available Quizzes
-          Text(
-            'Select a Quiz to Study',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-
-          if (quizzesWithQuestions.isEmpty)
-            _buildEmptyState(context)
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: quizzesWithQuestions.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final quiz = quizzesWithQuestions[index];
-                return _buildQuizCard(context, quiz);
-              },
-            ),
-        ],
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 32 : 16,
+        vertical: 20,
       ),
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          Text(title, style: TextStyle(color: Colors.grey.shade600)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModeCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String description,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 32),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            description,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuizCard(BuildContext context, QuizModel quiz) {
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        // Tapping the card body prioritizes Flashcard mode.
-        onTap: () => context.push('/study/flashcard/${quiz.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Plain Title Header ────────────────────────────────────
+              Text(
+                'Study Mode',
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Choose a quiz to start studying',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Stat Tiles ────────────────────────────────────────────
               Row(
                 children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Theme.of(context).colorScheme.primary,
-                          Theme.of(context).colorScheme.secondary,
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.quiz, color: Colors.white),
-                  ),
-                  const SizedBox(width: 16),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          quiz.title,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                    child: _StatTile(
+                      isDark: isDark,
+                      icon: Icons.folder_outlined,
+                      value: '${quizzesWithQuestions.length}',
+                      label: 'Available',
+                      sublabel: 'Ready to study',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _StatTile(
+                      isDark: isDark,
+                      icon: Icons.school_outlined,
+                      value: '$studiedCount',
+                      label: 'Studied',
+                      sublabel: 'Completed',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // ── Choose a Study Mode ───────────────────────────────────
+              Text(
+                'Choose a Study Mode',
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _StudyModeCard(
+                icon: Icons.style_rounded,
+                iconBg: const Color(0xFF78350F),
+                iconColor: const Color(0xFFFBBF24),
+                title: 'Flashcards',
+                subtitle: 'Flip cards to test your memory',
+                accentColor: const Color(0xFF92400E),
+                cardBg: const Color(0xFF1C1207),
+                borderColor: const Color(0xFF78350F),
+                onTap: quizzesWithQuestions.isNotEmpty
+                    ? () => context.push('/study/flashcard/${quizzesWithQuestions.first.id}')
+                    : null,
+              ),
+              const SizedBox(height: 10),
+              _StudyModeCard(
+                icon: Icons.quiz_rounded,
+                iconBg: const Color(0xFF14532D),
+                iconColor: const Color(0xFF4ADE80),
+                title: 'Quiz Mode',
+                subtitle: 'Multiple choice questions with scoring',
+                accentColor: const Color(0xFF166534),
+                cardBg: const Color(0xFF071C10),
+                borderColor: const Color(0xFF14532D),
+                onTap: quizzesWithQuestions.isNotEmpty
+                    ? () => context.push('/study/quiz/${quizzesWithQuestions.first.id}')
+                    : null,
+              ),
+              const SizedBox(height: 28),
+
+              // ── Select a Quiz to Study ────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Select a Quiz to Study',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => context.go('/my-quizzes'),
+                      child: Text(
+                        'View All Quizzes',
+                        style: TextStyle(
+                          color: _kIndigo,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.5,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${quiz.questionIds.length} questions',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: Colors.grey.shade600),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  // Primary action — Flashcards (prioritized)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          () => context.push('/study/flashcard/${quiz.id}'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      icon: const Icon(Icons.flip, size: 18),
-                      label: const Text('Flashcards'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Secondary action — Quiz Mode
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => context.push('/study/quiz/${quiz.id}'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.green,
-                        side: BorderSide(color: Colors.green.shade300),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      icon: const Icon(Icons.quiz, size: 18),
-                      label: const Text('Quiz Mode'),
-                    ),
-                  ),
-                ],
-              ),
+
+              if (quizzesWithQuestions.isEmpty)
+                _buildEmptyState(context, isDark)
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: quizzesWithQuestions.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final quiz = quizzesWithQuestions[index];
+                    return _QuizStudyCard(quiz: quiz, isDark: isDark);
+                  },
+                ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -341,29 +204,28 @@ class StudyModeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState(BuildContext context, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: isDark ? _kCard : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? _kBorder : Colors.grey.shade200),
       ),
       child: Column(
         children: [
-          Icon(Icons.school_outlined, size: 64, color: Colors.grey.shade400),
+          Icon(Icons.school_outlined, size: 56, color: Colors.grey.shade500),
           const SizedBox(height: 16),
-          Text(
-            'No quizzes available',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: Colors.grey.shade600),
-          ),
+          Text('No quizzes available',
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade300 : Colors.grey.shade600,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              )),
           const SizedBox(height: 8),
           Text(
             'Create quizzes with questions to start studying',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade500),
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12.5),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
@@ -373,6 +235,399 @@ class StudyModeScreen extends ConsumerWidget {
             label: const Text('Create Quiz'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stat Tile
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _StatTile extends StatelessWidget {
+  final bool isDark;
+  final IconData icon;
+  final String value;
+  final String label;
+  final String sublabel;
+
+  const _StatTile({
+    required this.isDark,
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.sublabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      decoration: BoxDecoration(
+        color: isDark ? _kCard : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? _kBorder : Colors.grey.shade200),
+        boxShadow: isDark
+            ? null
+            : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
+      ),
+      child: Column(
+        children: [
+          Icon(icon,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade500, size: 22),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: TextStyle(
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(label,
+              style: TextStyle(
+                  color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text(sublabel, style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Study Mode Card (Flashcards / Quiz Mode)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _StudyModeCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final Color accentColor;
+  final Color cardBg;
+  final Color borderColor;
+  final VoidCallback? onTap;
+
+  const _StudyModeCard({
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.accentColor,
+    required this.cardBg,
+    required this.borderColor,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        mouseCursor: onTap == null ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedOpacity(
+          opacity: onTap == null ? 0.5 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            decoration: BoxDecoration(
+              color: isDark ? cardBg : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: isDark ? borderColor : Colors.grey.shade200),
+              boxShadow: isDark
+                  ? null
+                  : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: isDark ? iconBg : iconBg.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: isDark ? iconColor : iconBg, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade500, size: 22),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Quiz Study Card (with action buttons)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _QuizStudyCard extends StatelessWidget {
+  final QuizModel quiz;
+  final bool isDark;
+  const _QuizStudyCard({required this.quiz, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? _kCard : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? _kBorder : Colors.grey.shade200),
+        boxShadow: isDark
+            ? null
+            : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
+      ),
+      child: Column(
+        children: [
+          // Card header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            child: Row(
+              children: [
+                // Quiz icon
+                Container(
+                  width: 46, height: 46,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_kPurple, _kIndigo],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 12),
+                // Title + category + info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        quiz.title,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if ((quiz.category ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          quiz.category!,
+                          style: const TextStyle(
+                              color: _kIndigo, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.help_outline_rounded, size: 11, color: Colors.grey.shade500),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${quiz.questionIds.length} Questions',
+                            style: TextStyle(color: Colors.grey.shade500, fontSize: 10.5),
+                          ),
+                          const SizedBox(width: 10),
+                          Icon(Icons.play_circle_outline_rounded, size: 11, color: Colors.grey.shade500),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Studied ${quiz.studyCount ?? 0} times',
+                            style: TextStyle(color: Colors.grey.shade500, fontSize: 10.5),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Progress + 3-dot menu
+                Column(
+                  children: [
+                    SizedBox(
+                      width: 38, height: 38,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            value: (quiz.averageScore ?? 0) / 100,
+                            strokeWidth: 3,
+                            backgroundColor: Colors.grey.shade700,
+                            valueColor: const AlwaysStoppedAnimation<Color>(_kGreen),
+                          ),
+                          Text(
+                            '${(quiz.averageScore ?? 0).toInt()}%',
+                            style: TextStyle(
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _QuizMenuButton(quiz: quiz),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(
+            height: 1,
+            color: isDark ? _kBorder : Colors.grey.shade200,
+          ),
+
+          // Action buttons
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _ActionBtn(
+                    label: 'Study with Flashcards',
+                    icon: Icons.style_rounded,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF8C00), Color(0xFFFF6B00)],
+                    ),
+                    shadowColor: Colors.orange,
+                    onPressed: () => context.push('/study/flashcard/${quiz.id}'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ActionBtn(
+                    label: 'Take Quiz',
+                    icon: Icons.quiz_rounded,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
+                    ),
+                    shadowColor: Colors.green,
+                    onPressed: () => context.push('/study/quiz/${quiz.id}'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuizMenuButton extends StatelessWidget {
+  final QuizModel quiz;
+  const _QuizMenuButton({required this.quiz});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_vert_rounded, size: 18, color: Colors.grey.shade500),
+      padding: EdgeInsets.zero,
+      itemBuilder: (_) => [
+        const PopupMenuItem(value: 'detail', child: Text('View Details')),
+        const PopupMenuItem(value: 'flashcard', child: Text('Study Flashcards')),
+        const PopupMenuItem(value: 'quiz', child: Text('Take Quiz')),
+      ],
+      onSelected: (val) {
+        if (val == 'detail') context.push('/quiz/${quiz.id}');
+        if (val == 'flashcard') context.push('/study/flashcard/${quiz.id}');
+        if (val == 'quiz') context.push('/study/quiz/${quiz.id}');
+      },
+    );
+  }
+}
+
+class _ActionBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Gradient gradient;
+  final Color shadowColor;
+  final VoidCallback onPressed;
+
+  const _ActionBtn({
+    required this.label,
+    required this.icon,
+    required this.gradient,
+    required this.shadowColor,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        mouseCursor: SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(11),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(11),
+            boxShadow: [
+              BoxShadow(
+                color: shadowColor.withValues(alpha: 0.30),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 15),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

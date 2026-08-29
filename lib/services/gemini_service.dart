@@ -40,6 +40,88 @@ class GeneratedQuestion {
 }
 
 class GeminiService {
+  /// Generate a quiz from multiple files simultaneously.
+  Future<GeneratedQuizResult> generateQuizFromMultipleFiles({
+    required List<({Uint8List bytes, String fileName})> files,
+    int questionCount = 10,
+    String difficulty = 'Medium',
+    List<String>? selectedTypes,
+    String? customInstruction,
+  }) async {
+    if (files.isEmpty) {
+      throw Exception('No files selected.');
+    }
+    if (files.length == 1) {
+      return generateQuiz(
+        fileBytes: files.first.bytes,
+        fileName: files.first.fileName,
+        questionCount: questionCount,
+        difficulty: difficulty,
+        selectedTypes: selectedTypes,
+        customInstruction: customInstruction,
+      );
+    }
+
+    final apiKey = AppConfig.geminiApiKey.trim();
+    if (apiKey.isEmpty || apiKey == 'YOUR_GEMINI_API_KEY') {
+      throw Exception(
+        'Missing Gemini API Key! Please add your API Key in lib/config/app_config.dart',
+      );
+    }
+
+    final prompt = _buildPrompt(questionCount, difficulty, selectedTypes, customInstruction);
+    final List<Part> parts = [];
+
+    for (var i = 0; i < files.length; i++) {
+      final f = files[i];
+      final ext = f.fileName.split('.').last.toLowerCase();
+      if (ext == 'pdf') {
+        parts.add(DataPart('application/pdf', f.bytes));
+      } else {
+        final text = await extractText(f.bytes, ext);
+        if (text != null && text.trim().isNotEmpty) {
+          parts.add(TextPart('DOCUMENT ${i + 1} (${f.fileName}):\n$text'));
+        }
+      }
+    }
+    parts.add(TextPart(prompt));
+
+    final modelsToTry = [
+      AppConfig.geminiModel,
+      'gemini-flash-latest',
+      'gemini-pro-latest',
+      'gemini-2.0-flash',
+    ];
+
+    Object? lastError;
+    GenerateContentResponse? response;
+
+    for (final modelName in modelsToTry) {
+      try {
+        final model = GenerativeModel(
+          model: modelName,
+          apiKey: apiKey,
+          generationConfig: GenerationConfig(
+            responseMimeType: 'application/json',
+            temperature: 0.4,
+          ),
+        );
+        final res = await model.generateContent([Content.multi(parts)]);
+        if (res.text != null && res.text!.isNotEmpty) {
+          response = res;
+          break;
+        }
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    if (response == null || response.text == null || response.text!.isEmpty) {
+      throw lastError ?? Exception('Gemini returned an empty response. Please try again.');
+    }
+
+    return _parseResponse(response.text!);
+  }
 
   // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -204,13 +286,12 @@ Follow the above instructions carefully when generating questions.
 ''';
     }
 
-    // Build allowed types section
+    // Build allowed types section — flashcard is never a standalone type.
     final allowedTypes = (selectedTypes != null && selectedTypes.isNotEmpty)
-        ? selectedTypes
-        : ['mcq', 'flashcard', 'identification', 'enumeration'];
+        ? selectedTypes.where((t) => t != 'flashcard').toList()
+        : ['mcq', 'identification', 'enumeration'];
     final typeDescriptions = {
       'mcq': '"mcq": Multiple choice (4 choices, 1 correct index)',
-      'flashcard': '"flashcard": Memory flipcard (question + back answer)',
       'identification': '"identification": Short keyword answer (user types)',
       'enumeration': '"enumeration": List of key terms (comma-separated)',
     };
@@ -248,11 +329,6 @@ Return ONLY valid JSON matching this exact schema — no markdown, no conversati
       "correct_answer_index": 0
     },
     {
-      "type": "flashcard",
-      "question": "...",
-      "answer": "..."
-    },
-    {
       "type": "identification",
       "question": "...",
       "answer": "<short keyword/term>"
@@ -281,17 +357,8 @@ Return ONLY valid JSON matching this exact schema — no markdown, no conversati
       final map = q as Map<String, dynamic>;
       final type = (map['type'] as String?)?.toLowerCase() ?? 'mcq';
 
-      if (type == 'flashcard') {
-        final ans = (map['answer'] as String?) ?? '';
-        return GeneratedQuestion(
-          questionText: (map['question'] as String?) ?? '',
-          options: [ans],
-          correctAnswerIndex: 0,
-          isFlashcard: true,
-          flashcardBack: ans,
-          questionType: 'flashcard',
-        );
-      } else if (type == 'identification') {
+      // flashcard type is no longer standalone — treat as identification.
+      if (type == 'flashcard' || type == 'identification') {
         final ans = (map['answer'] as String?) ?? '';
         return GeneratedQuestion(
           questionText: (map['question'] as String?) ?? '',
@@ -315,15 +382,19 @@ Return ONLY valid JSON matching this exact schema — no markdown, no conversati
           questionType: 'enumeration',
         );
       } else {
+        // mcq — set flashcardBack to the correct option text automatically.
         final opts = (map['options'] as List<dynamic>?)
                 ?.map((o) => o.toString())
                 .toList() ??
             ['Option A', 'Option B', 'Option C', 'Option D'];
+        final correctIdx = (map['correct_answer_index'] as int?) ?? 0;
+        final safeIdx = (correctIdx >= 0 && correctIdx < opts.length) ? correctIdx : 0;
         return GeneratedQuestion(
           questionText: (map['question'] as String?) ?? '',
           options: opts,
-          correctAnswerIndex: (map['correct_answer_index'] as int?) ?? 0,
+          correctAnswerIndex: safeIdx,
           isFlashcard: false,
+          flashcardBack: opts.isNotEmpty ? opts[safeIdx] : null,
           questionType: 'mcq',
         );
       }

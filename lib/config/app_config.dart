@@ -4,7 +4,11 @@ class AppConfig {
   AppConfig._();
 
   /// Google Gemini API key (free tier).
-  static const String geminiApiKey = "GEMINI_API_KEY";
+  /// Can be passed securely at build time via: flutter build web --dart-define=GEMINI_API_KEY=your_key
+  static const String geminiApiKey = String.fromEnvironment(
+    'GEMINI_API_KEY',
+    defaultValue: "AQ.Ab8RN6J0ChBCTMqgrLKqih4PHHGLjbxLQdCt2OAh2NA84i7KhQ",
+  );
 
   /// Primary model for AI quiz generation.
   static const String geminiModel = 'gemini-flash-latest';

@@ -9,6 +9,16 @@ import '../../providers/connectivity_provider.dart';
 import '../../models/quiz_model.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/offline_mode_dialog.dart';
+import '../../widgets/responsive_layout.dart';
+
+// ── Design Tokens ───────────────────────────────────────────────────────────
+const _kCard    = Color(0xFF1E293B);
+const _kBorder  = Color(0xFF334155);
+const _kOrange  = Color(0xFFFF8C00);
+const _kGreen   = Color(0xFF22C55E);
+const _kBlue    = Color(0xFF3B82F6);
+const _kPurple  = Color(0xFF8B5CF6);
+const _kIndigo  = Color(0xFF6366F1);
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -25,7 +35,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Kick off the streak check as soon as the screen is visible.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(streakProvider);
       _startSlowLoadTimer();
@@ -40,14 +49,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _startSlowLoadTimer() {
     _slowLoadTimer?.cancel();
-    // If data is still loading after 30 seconds, offer the offline modal.
     _slowLoadTimer = Timer(const Duration(seconds: 30), () {
       if (!mounted) return;
       final userAsync = ref.read(currentUserProvider);
       final user = userAsync.valueOrNull;
-      final isQuizzesLoading = user != null && ref.read(userQuizzesProvider(user.id)).isLoading;
+      final isQuizzesLoading =
+          user != null && ref.read(userQuizzesProvider(user.id)).isLoading;
       final isAuthLoading = userAsync.isLoading;
-
       if ((isAuthLoading || isQuizzesLoading) && !_dialogShown && !_isOfflineMode) {
         _showOfflineDialog();
       }
@@ -70,500 +78,339 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
-
-    // Show skeleton while Firebase Auth is still initialising
     if (userAsync.isLoading && !_isOfflineMode) return const PageSkeleton();
 
     final user = userAsync.valueOrNull;
-    final quizzesAsync =
-        user != null
-            ? ref.watch(userQuizzesProvider(user.id))
-            : const AsyncValue.data(<QuizModel>[]);
+    final quizzesAsync = user != null
+        ? ref.watch(userQuizzesProvider(user.id))
+        : const AsyncValue<List<QuizModel>>.data([]);
 
     return quizzesAsync.when(
       data: (quizzes) => _buildContent(context, ref, user, quizzes),
       loading: () => const PageSkeleton(),
-
-      error:
-          (e, _) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.cloud_off_rounded,
-                  size: 64,
-                  color: Color(0xFF6C63FF),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Could not load data',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Check your internet connection',
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
-                if (user != null) ...[
-                  const SizedBox(height: 20),
-                  ElevatedButton.icon(
-                    onPressed:
-                        () =>
-                            ref
-                                .read(userQuizzesProvider(user.id).notifier)
-                                .refreshQuizzes(),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => setState(() => _isOfflineMode = true),
-                    child: const Text('Use Offline Mode'),
-                  ),
-                ],
-              ],
-            ),
-          ),
+      error: (e, _) => _buildError(context, ref, user, e),
       skipLoadingOnReload: true,
       skipLoadingOnRefresh: true,
+    );
+  }
+
+  Widget _buildError(BuildContext context, WidgetRef ref, dynamic user, Object e) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_off_rounded, size: 64, color: _kIndigo),
+          const SizedBox(height: 16),
+          Text('Could not load data', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text('Check your internet connection',
+              style: TextStyle(color: Colors.grey.shade600)),
+          if (user != null) ...[
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () =>
+                  ref.read(userQuizzesProvider(user.id).notifier).refreshQuizzes(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => setState(() => _isOfflineMode = true),
+              child: const Text('Use Offline Mode'),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
   Widget _buildContent(
     BuildContext context,
     WidgetRef ref,
-    user,
+    dynamic user,
     List<QuizModel> quizzes,
   ) {
-    final recentQuizzes = quizzes.take(3).toList();
-    final totalQuizzes = quizzes.length;
-    final totalQuestions = quizzes.fold<int>(
-      0,
-      (sum, quiz) => sum + quiz.questionIds.length,
-    );
-    final streakAsync = ref.watch(streakProvider);
-    final streakCount = streakAsync.valueOrNull ?? user?.streakCount ?? 0;
-    final isOnline = ref.watch(isOnlineProvider).valueOrNull ?? true;
+    final recentQuizzes = quizzes.take(6).toList();
+    final totalQuizzes  = quizzes.length;
+    final totalQuestions = quizzes.fold<int>(0, (s, q) => s + q.questionIds.length);
+    final streakAsync   = ref.watch(streakProvider);
+    final streakCount   = streakAsync.valueOrNull ?? user?.streakCount ?? 0;
+    final isOnline      = ref.watch(isOnlineProvider).valueOrNull ?? true;
+    final isDesktop     = ResponsiveBreakpoints.isDesktop(context);
 
-    return RefreshIndicator(
-      onRefresh:
-          user != null
-              ? () =>
-                  ref
-                      .read(userQuizzesProvider(user.id).notifier)
-                      .refreshQuizzes()
-              : () async {},
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final offlineBanner = (_isOfflineMode || !isOnline)
+        ? _buildOfflineBanner(context, isOnline)
+        : const SizedBox.shrink();
+
+    Widget mainContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        offlineBanner,
+        if (_isOfflineMode || !isOnline) const SizedBox(height: 12),
+
+        // Hero Banner
+        _HeroBanner(user: user),
+        const SizedBox(height: 20),
+
+        // Progress Overview
+        const _SectionHeader(title: 'Your Progress Overview'),
+        const SizedBox(height: 12),
+        _ProgressStats(
+          streakCount: streakCount,
+          totalQuizzes: totalQuizzes,
+          totalQuestions: totalQuestions,
+        ),
+        const SizedBox(height: 24),
+
+        // Recent Study Decks + AI Promo
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // ── Offline badge ──────────────────────────────────────────────
-            if (_isOfflineMode || !isOnline)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 16,
-                      color: Colors.orange.shade700,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Offline Mode — showing cached data',
-                      style: TextStyle(
-                        color: Colors.orange.shade800,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    if (_isOfflineMode && isOnline) ...[
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () => setState(() => _isOfflineMode = false),
-                        child: Text(
-                          'Go online',
-                          style: TextStyle(
-                            color: Colors.orange.shade900,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+            const _SectionHeader(title: 'Recent Study Decks'),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => context.go('/my-quizzes'),
+                child: Text(
+                  '→ View All',
+                  style: TextStyle(
+                    color: _kIndigo,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-
-            // ── Welcome card ───────────────────────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Theme.of(context).colorScheme.primary,
-                    Theme.of(context).colorScheme.secondary,
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          color: Colors.white.withValues(alpha: 0.18),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Image.asset(
-                          'assets/images/Logo.png',
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Self Study',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.titleMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.95),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Welcome back,',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    user?.name ?? 'Student',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Ready to learn something new today?',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.8),
-                    ),
-                  ),
-                ],
-              ),
             ),
-            const SizedBox(height: 16),
-
-            // ── Streak card ────────────────────────────────────────────────
-            _StreakCard(streakCount: streakCount, isOnline: isOnline),
-            const SizedBox(height: 24),
-
-            // ── Stats ──────────────────────────────────────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    icon: Icons.folder_outlined,
-                    title: 'Quizzes',
-                    value: totalQuizzes.toString(),
-                    color: Colors.blue,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    icon: Icons.help_outline,
-                    title: 'Questions',
-                    value: totalQuestions.toString(),
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    icon: Icons.school_outlined,
-                    title: 'Studied',
-                    value:
-                        quizzes
-                            .fold<int>(0, (sum, q) => sum + (q.studyCount ?? 0))
-                            .toString(),
-                    color: Colors.orange,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // ── Quick Actions ──────────────────────────────────────────────
-            Text(
-              'Quick Actions',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildActionCard(
-                    context,
-                    icon: Icons.add_circle_outline,
-                    title: 'Create Quiz',
-                    subtitle: 'Make a new study set',
-                    color: Colors.purple,
-                    onTap: () => context.push('/create-quiz'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildActionCard(
-                    context,
-                    icon: Icons.school_outlined,
-                    title: 'Study Mode',
-                    subtitle: 'Review your quizzes',
-                    color: Colors.teal,
-                    onTap: () => context.push('/study'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // ── AI Generator button (online-only) ──────────────────────────
-            _AiGenerateButton(
-              isOnline: isOnline,
-              onTap: () => context.push('/ai-generator'),
-            ),
-            const SizedBox(height: 24),
-
-            // ── Recent Quizzes ─────────────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Recent Quizzes',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                TextButton(
-                  onPressed: () => context.push('/my-quizzes'),
-                  child: const Text('View All'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (recentQuizzes.isEmpty)
-              _buildEmptyState(context)
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: recentQuizzes.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final quiz = recentQuizzes[index];
-                  return _buildQuizCard(context, quiz);
-                },
-              ),
-            const SizedBox(height: 24),
           ],
         ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: isDesktop ? 6 : 55,
+              child: recentQuizzes.isEmpty
+                  ? _EmptyDecks(onTap: () => context.go('/create-quiz'))
+                  : Column(
+                      children: recentQuizzes
+                          .take(isDesktop ? 4 : 3)
+                          .map((quiz) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: _DeckListTile(quiz: quiz),
+                              ))
+                          .toList(),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: isDesktop ? 4 : 45,
+              child: _AiPromoCard(isOnline: isOnline),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        // Continue Learning Journey
+        const _SectionHeader(title: 'Continue Your Learning Journey'),
+        const SizedBox(height: 12),
+        _ContinueLearningBanner(isOnline: isOnline),
+        const SizedBox(height: 24),
+      ],
+    );
+
+    if (isDesktop) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        child: mainContent,
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: user != null
+          ? () => ref.read(userQuizzesProvider(user.id).notifier).refreshQuizzes()
+          : () async {},
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: mainContent,
       ),
     );
   }
 
-  Widget _buildStatCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-  }) {
+  Widget _buildOfflineBanner(BuildContext context, bool isOnline) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: color,
+          Icon(Icons.wifi_off_rounded, size: 16, color: Colors.orange.shade700),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Offline Mode — showing cached data',
+              style: TextStyle(
+                  color: Colors.orange.shade800,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500),
             ),
           ),
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
-          ),
+          if (_isOfflineMode && isOnline)
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => setState(() => _isOfflineMode = false),
+                child: Text(
+                  'Go online',
+                  style: TextStyle(
+                    color: Colors.orange.shade900,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildActionCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color.withValues(alpha: 0.8), color],
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: Colors.white, size: 32),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.8),
-              ),
-            ),
-          ],
-        ),
+// ─────────────────────────────────────────────────────────────────────────────
+// Section Header
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        color: isDark ? Colors.white : const Color(0xFF1E293B),
       ),
     );
   }
+}
 
-  Widget _buildQuizCard(BuildContext context, QuizModel quiz) {
-    return GestureDetector(
-      onTap: () => context.push('/quiz/${quiz.id}'),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(context).colorScheme.primary,
-                      Theme.of(context).colorScheme.secondary,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.quiz, color: Colors.white),
+// ─────────────────────────────────────────────────────────────────────────────
+// Hero Banner
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HeroBanner extends StatelessWidget {
+  final dynamic user;
+  const _HeroBanner({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final showIllustration = width >= 480;
+
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 150),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E1B4B), Color(0xFF312E81)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: _kIndigo.withValues(alpha: 0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        clipBehavior: Clip.antiAlias,
+        children: [
+          // Sparkle decorations
+          Positioned(right: showIllustration ? 210 : 16, top: 12,
+            child: Icon(Icons.auto_awesome, color: Colors.white.withValues(alpha: 0.15), size: 16)),
+          Positioned(right: showIllustration ? 260 : 56, top: 38,
+            child: Icon(Icons.star_rounded, color: Colors.white.withValues(alpha: 0.10), size: 10)),
+          Positioned(right: showIllustration ? 190 : 10, bottom: 18,
+            child: Icon(Icons.auto_awesome, color: Colors.white.withValues(alpha: 0.10), size: 12)),
+
+          // Right-side decorative illustration
+          if (showIllustration)
+            Positioned(
+              right: 0, top: 0, bottom: 0,
+              child: SizedBox(
+                width: 195,
+                child: _HeroDecoration(),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+
+          // Text content
+          Padding(
+            padding: EdgeInsets.fromLTRB(22, 26, showIllustration ? 210 : 22, 26),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Welcome back,',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.70),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${(user?.name ?? 'Student').toUpperCase()} 👋',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'What subject would you like to master today?',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.60),
+                    fontSize: 12.5,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
                   children: [
-                    Text(
-                      quiz.title,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    _HeroBtn(
+                      label: 'Generate with AI',
+                      icon: Icons.auto_awesome_rounded,
+                      onTap: () => context.go('/ai-generator'),
+                      filled: true,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${quiz.questionIds.length} questions',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey.shade600,
-                      ),
+                    _HeroBtn(
+                      label: 'Create New Deck',
+                      icon: Icons.add_rounded,
+                      onTap: () => context.go('/create-quiz'),
+                      filled: false,
                     ),
                   ],
                 ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Icon(Icons.folder_open_outlined, size: 48, color: Colors.grey.shade400),
-          const SizedBox(height: 12),
-          Text(
-            'No quizzes yet',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Create your first quiz to get started!',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade500),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () => context.push('/create-quiz'),
-            icon: const Icon(Icons.add),
-            label: const Text('Create Quiz'),
+              ],
+            ),
           ),
         ],
       ),
@@ -571,256 +418,613 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-// ── Streak Card ─────────────────────────────────────────────────────────────────
+class _HeroDecoration extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Glow
+        Positioned(
+          right: 20, top: 15,
+          child: Container(
+            width: 140, height: 140,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _kPurple.withValues(alpha: 0.18),
+            ),
+          ),
+        ),
+        // Person avatar
+        Positioned(
+          right: 52, top: 22,
+          child: Container(
+            width: 74, height: 74,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [_kIndigo, _kPurple]),
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: _kIndigo.withValues(alpha: 0.45), blurRadius: 18)],
+            ),
+            child: const Icon(Icons.person_rounded, color: Colors.white, size: 38),
+          ),
+        ),
+        // Floating card: Study Progress
+        Positioned(
+          right: 8, top: 14,
+          child: _MiniFloatCard(icon: Icons.trending_up_rounded, label: 'Study Progress', color: _kIndigo),
+        ),
+        // Floating card: Knowledge
+        Positioned(
+          right: 90, bottom: 22,
+          child: _MiniFloatCard(icon: Icons.pie_chart_rounded, label: 'Knowledge', color: _kOrange),
+        ),
+        // Floating card: Score
+        Positioned(
+          right: 6, bottom: 32,
+          child: _MiniFloatCard(icon: Icons.star_rounded, label: 'Score', color: _kGreen),
+        ),
+      ],
+    );
+  }
+}
 
-class _StreakCard extends StatelessWidget {
-  final int streakCount;
-  final bool isOnline;
-
-  const _StreakCard({required this.streakCount, required this.isOnline});
+class _MiniFloatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _MiniFloatCard({required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    final today = _todayLabel();
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFFFCC80)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withValues(alpha: 0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: const Color(0xFF1E293B).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.18), blurRadius: 8)],
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Flame icon
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFF6B35), Color(0xFFFF8C00)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.orange.withValues(alpha: 0.4),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: const Icon(Icons.local_fire_department, color: Colors.white, size: 28),
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool filled;
+  const _HeroBtn({required this.label, required this.icon, required this.onTap, required this.filled});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: filled ? _kPurple : Colors.white.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: filled ? null : Border.all(color: Colors.white.withValues(alpha: 0.28)),
+            boxShadow: filled
+                ? [BoxShadow(color: _kPurple.withValues(alpha: 0.40), blurRadius: 10, offset: const Offset(0, 4))]
+                : null,
           ),
-          const SizedBox(width: 16),
-          Expanded(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 14),
+              const SizedBox(width: 6),
+              Text(label, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Progress Stats (3 cards)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ProgressStats extends StatelessWidget {
+  final int streakCount;
+  final int totalQuizzes;
+  final int totalQuestions;
+
+  const _ProgressStats({
+    required this.streakCount,
+    required this.totalQuizzes,
+    required this.totalQuestions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final todayLabel = '${months[now.month - 1]} ${now.day}';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Row(
+      children: [
+        // ── Daily Streak ──
+        Expanded(
+          child: _StatTile(
+            isDark: isDark,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 32, height: 32,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFFFF6B35), _kOrange]),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.local_fire_department, color: Colors.white, size: 17),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
                 Text(
                   'Daily Streak',
-                  style: TextStyle(
-                    color: Colors.orange.shade800,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(color: Colors.orange.shade400, fontSize: 10.5, fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
                       '$streakCount',
-                      style: const TextStyle(
-                        color: Color(0xFFE65100),
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        height: 1,
-                      ),
+                      style: const TextStyle(color: Color(0xFFFF8C00), fontSize: 26, fontWeight: FontWeight.bold, height: 1),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 3),
                     Text(
                       streakCount == 1 ? 'day' : 'days',
-                      style: TextStyle(
-                        color: Colors.orange.shade700,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: TextStyle(color: Colors.orange.shade400, fontSize: 11),
                     ),
                   ],
+                ),
+                const SizedBox(height: 5),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.28)),
+                  ),
+                  child: Text(
+                    '✅ $todayLabel',
+                    style: TextStyle(color: Colors.orange.shade300, fontSize: 9.5, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+        ),
+        const SizedBox(width: 8),
+        // ── Quizzes Created ──
+        Expanded(
+          child: _StatTile(
+            isDark: isDark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    color: _kBlue.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.folder_rounded, color: _kBlue, size: 17),
+                ),
+                const SizedBox(height: 7),
+                Text('Quizzes Created',
+                    style: TextStyle(color: Colors.grey.shade400, fontSize: 10.5, fontWeight: FontWeight.w600),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 3),
+                Text(
+                  '$totalQuizzes',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text('Total', style: TextStyle(color: Colors.grey.shade500, fontSize: 10)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // ── Questions Studied ──
+        Expanded(
+          child: _StatTile(
+            isDark: isDark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    color: _kGreen.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.check_circle_rounded, color: _kGreen, size: 17),
+                ),
+                const SizedBox(height: 7),
+                Text('Questions Studied',
+                    style: TextStyle(color: Colors.grey.shade400, fontSize: 10.5, fontWeight: FontWeight.w600),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 3),
+                Text(
+                  '$totalQuestions',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text('Total', style: TextStyle(color: Colors.grey.shade500, fontSize: 10)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final Widget child;
+  final bool isDark;
+  const _StatTile({required this.child, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? _kCard : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? _kBorder : Colors.grey.shade200),
+        boxShadow: isDark
+            ? null
+            : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
+      ),
+      child: child,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deck List Tile
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DeckListTile extends StatelessWidget {
+  final QuizModel quiz;
+  const _DeckListTile({required this.quiz});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => context.push('/quiz/${quiz.id}'),
+        mouseCursor: SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(13),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: isDark ? _kCard : Colors.white,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: isDark ? _kBorder : Colors.grey.shade200),
+          ),
+          child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                width: 42, height: 42,
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.orange.shade300),
-                ),
-                child: Text(
-                  '✅ $today',
-                  style: TextStyle(
-                    color: Colors.orange.shade800,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                  gradient: const LinearGradient(
+                    colors: [_kPurple, _kIndigo],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      quiz.title,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if ((quiz.category ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(quiz.category!,
+                          style: const TextStyle(color: _kIndigo, fontSize: 10.5, fontWeight: FontWeight.w600)),
+                    ],
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(Icons.help_outline_rounded, size: 10, color: Colors.grey.shade500),
+                        const SizedBox(width: 2),
+                        Text('${quiz.questionIds.length} Questions',
+                            style: TextStyle(color: Colors.grey.shade500, fontSize: 9.5)),
+                        const SizedBox(width: 8),
+                        Icon(Icons.play_circle_outline_rounded, size: 10, color: Colors.grey.shade500),
+                        const SizedBox(width: 2),
+                        Text('Studied ${quiz.studyCount ?? 0} times',
+                            style: TextStyle(color: Colors.grey.shade500, fontSize: 9.5)),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              if (!isOnline) ...[
-                const SizedBox(height: 4),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 36, height: 36,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: (quiz.averageScore ?? 0) / 100,
+                      strokeWidth: 3,
+                      backgroundColor: Colors.grey.shade700,
+                      valueColor: const AlwaysStoppedAnimation<Color>(_kGreen),
+                    ),
+                    Text(
+                      '${(quiz.averageScore ?? 0).toInt()}%',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(Icons.chevron_right_rounded, color: Colors.grey.shade500, size: 19),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Promo Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AiPromoCard extends StatelessWidget {
+  final bool isOnline;
+  const _AiPromoCard({required this.isOnline});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isOnline ? () => context.go('/ai-generator') : null,
+        mouseCursor: isOnline ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        borderRadius: BorderRadius.circular(13),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF1E293B),
+                const Color(0xFF6D28D9).withValues(alpha: 0.45),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: _kPurple.withValues(alpha: 0.30)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 34, height: 34,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [_kPurple, _kIndigo]),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
+                  ),
+                  const SizedBox(width: 9),
+                  const Expanded(
+                    child: Text(
+                      'AI Quiz Generator',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Paste notes or upload PDFs to generate smart flashcards instantly with AI.',
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.60), fontSize: 11.5, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    'Try AI Generator',
+                    style: TextStyle(
+                      color: isOnline ? _kPurple : Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_rounded,
+                      color: isOnline ? _kPurple : Colors.grey, size: 13),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Continue Learning Banner
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ContinueLearningBanner extends StatelessWidget {
+  final bool isOnline;
+  const _ContinueLearningBanner({required this.isOnline});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? _kCard : Colors.white,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: isDark ? _kBorder : Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42, height: 42,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [_kPurple, _kIndigo]),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  'Syncing when online',
+                  'Elevate your learning with AI',
                   style: TextStyle(
-                    color: Colors.orange.shade600,
-                    fontSize: 10,
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
                   ),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  'Get personalized quizzes and smart flashcards tailored to your needs.',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11, height: 1.3),
+                ),
               ],
-            ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isOnline ? () => context.go('/ai-generator') : null,
+              mouseCursor: isOnline ? SystemMouseCursors.click : SystemMouseCursors.basic,
+              borderRadius: BorderRadius.circular(9),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: isOnline
+                      ? const LinearGradient(colors: [_kPurple, _kIndigo])
+                      : null,
+                  color: isOnline ? null : Colors.grey.shade700,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Text('Start with AI',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11.5)),
+                    SizedBox(width: 4),
+                    Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 12),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
-
-  String _todayLabel() {
-    final now = DateTime.now();
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[now.month - 1]} ${now.day}';
-  }
 }
 
-// ── AI Generator Button ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Empty Decks
+// ─────────────────────────────────────────────────────────────────────────────
 
-class _AiGenerateButton extends StatelessWidget {
-  final bool isOnline;
+class _EmptyDecks extends StatelessWidget {
   final VoidCallback onTap;
-
-  const _AiGenerateButton({required this.isOnline, required this.onTap});
+  const _EmptyDecks({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isOnline ? onTap : () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('AI generation requires internet connection'),
-            backgroundColor: Color(0xFF6C63FF),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? _kCard : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: isDark ? _kBorder : Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.folder_open_rounded, size: 40, color: Colors.grey.shade500),
+          const SizedBox(height: 8),
+          Text('No study decks yet',
+              style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text('Create your first deck to get started!',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: onTap,
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('Create Quiz'),
           ),
-        );
-      },
-      child: AnimatedOpacity(
-        opacity: isOnline ? 1.0 : 0.55,
-        duration: const Duration(milliseconds: 300),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF6C63FF), Color(0xFF4834D4)],
-            ),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF6C63FF).withValues(alpha: 0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome,
-                  color: Colors.white,
-                  size: 26,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'Generate with AI',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'FREE',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      isOnline
-                          ? 'Upload PDF, TXT or DOCX → instant quiz'
-                          : 'Requires internet connection',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.75),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.white.withValues(alpha: 0.7),
-                size: 16,
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }

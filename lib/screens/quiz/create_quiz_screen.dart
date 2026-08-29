@@ -7,39 +7,39 @@ import '../../providers/connectivity_provider.dart';
 
 // ── Question type enum ────────────────────────────────────────────────────────
 
-enum QuizMode { flashcard, mcq, enumeration, identification }
+enum QuizMode { mcq, enumeration, identification, combine }
 
 extension QuizModeX on QuizMode {
   String get label {
     switch (this) {
-      case QuizMode.flashcard:
-        return 'Flashcard';
+      case QuizMode.combine:
+        return 'Combine';
       case QuizMode.mcq:
         return 'Quiz';
       case QuizMode.enumeration:
         return 'Enumeration';
       case QuizMode.identification:
-        return 'Identification';
+        return 'Identification (Best for Flashcard)';
     }
   }
 
   String get description {
     switch (this) {
-      case QuizMode.flashcard:
-        return 'Create cards for effective memorization';
+      case QuizMode.combine:
+        return 'Mix MCQ, Identification & Enumeration in one quiz';
       case QuizMode.mcq:
         return 'Test knowledge with multiple choice questions';
       case QuizMode.enumeration:
         return 'List items in the correct order';
       case QuizMode.identification:
-        return 'Identify items from images or text';
+        return 'Short keyword answers — perfect for flashcard study mode';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case QuizMode.flashcard:
-        return Icons.style_rounded;
+      case QuizMode.combine:
+        return Icons.merge_type_rounded;
       case QuizMode.mcq:
         return Icons.quiz_rounded;
       case QuizMode.enumeration:
@@ -51,8 +51,8 @@ extension QuizModeX on QuizMode {
 
   Color get color {
     switch (this) {
-      case QuizMode.flashcard:
-        return const Color(0xFF7C6FF7);
+      case QuizMode.combine:
+        return const Color(0xFFEC4899);
       case QuizMode.mcq:
         return const Color(0xFF3B82F6);
       case QuizMode.enumeration:
@@ -64,8 +64,8 @@ extension QuizModeX on QuizMode {
 
   String get questionType {
     switch (this) {
-      case QuizMode.flashcard:
-        return 'flashcard';
+      case QuizMode.combine:
+        return 'mcq'; // placeholder; each question has its own type
       case QuizMode.mcq:
         return 'mcq';
       case QuizMode.enumeration:
@@ -80,7 +80,7 @@ extension QuizModeX on QuizMode {
 
 class QuestionFormData {
   final TextEditingController questionController = TextEditingController();
-  // Flashcard / Identification
+  // Identification answer
   final TextEditingController backController = TextEditingController();
   // MCQ options
   final List<TextEditingController> options = [
@@ -96,12 +96,14 @@ class QuestionFormData {
     TextEditingController(),
   ];
   int correctAnswerIndex = 0;
+  // Per-question type used when the quiz is in Combine mode
+  QuizMode selectedType = QuizMode.mcq;
 
   void dispose() {
     questionController.dispose();
     backController.dispose();
-    for (final c in options) c.dispose();
-    for (final c in enumItems) c.dispose();
+    for (final c in options) { c.dispose(); }
+    for (final c in enumItems) { c.dispose(); }
   }
 }
 
@@ -126,7 +128,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
   final _categoryController = TextEditingController();
 
   // Step 2 — Mode
-  QuizMode _selectedMode = QuizMode.flashcard;
+  QuizMode _selectedMode = QuizMode.mcq;
 
   // Step 3 — Questions
   final List<QuestionFormData> _questions = [];
@@ -140,7 +142,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
     _titleController.dispose();
     _descController.dispose();
     _categoryController.dispose();
-    for (final q in _questions) q.dispose();
+    for (final q in _questions) { q.dispose(); }
     super.dispose();
   }
 
@@ -185,7 +187,11 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
         _showSnack('Enter text for Question $n.', isError: true);
         return false;
       }
-      switch (_selectedMode) {
+      // Determine effective type (per-question for combine, global otherwise)
+      final effectiveType = _selectedMode == QuizMode.combine
+          ? q.selectedType
+          : _selectedMode;
+      switch (effectiveType) {
         case QuizMode.mcq:
           if (q.options.any((o) => o.text.trim().isEmpty)) {
             _showSnack('Fill all 4 options for Question $n.', isError: true);
@@ -198,12 +204,13 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
             _showSnack('Add at least one item for Question $n.', isError: true);
             return false;
           }
-        case QuizMode.flashcard:
         case QuizMode.identification:
           if (q.backController.text.trim().isEmpty) {
             _showSnack('Enter the answer for Question $n.', isError: true);
             return false;
           }
+        case QuizMode.combine:
+          break; // handled above
       }
     }
     return true;
@@ -247,23 +254,34 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
       for (final q in _questions) {
         List<String> options;
         String? flashcardBack;
+        String questionType;
+        bool isFlashcard = false;
 
-        switch (_selectedMode) {
-          case QuizMode.flashcard:
-            options = [q.backController.text.trim()];
-            flashcardBack = q.backController.text.trim();
+        // Determine effective type per question (combine) or global
+        final effectiveType = _selectedMode == QuizMode.combine
+            ? q.selectedType
+            : _selectedMode;
+
+        switch (effectiveType) {
           case QuizMode.identification:
             options = [q.backController.text.trim()];
             flashcardBack = q.backController.text.trim();
+            questionType = 'identification';
           case QuizMode.enumeration:
             options = q.enumItems
                 .map((c) => c.text.trim())
                 .where((t) => t.isNotEmpty)
                 .toList();
             flashcardBack = options.join(', ');
+            questionType = 'enumeration';
           case QuizMode.mcq:
+          case QuizMode.combine:
             options = q.options.map((c) => c.text.trim()).toList();
-            flashcardBack = null;
+            final correctIdx = q.correctAnswerIndex;
+            flashcardBack = (correctIdx >= 0 && correctIdx < options.length)
+                ? options[correctIdx]
+                : null;
+            questionType = 'mcq';
         }
 
         await ref
@@ -273,10 +291,12 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
               questionText: q.questionController.text.trim(),
               options: options,
               correctAnswerIndex:
-                  _selectedMode == QuizMode.mcq ? q.correctAnswerIndex : 0,
-              isFlashcard: _selectedMode == QuizMode.flashcard,
+                  (effectiveType == QuizMode.mcq || _selectedMode == QuizMode.combine && q.selectedType == QuizMode.mcq)
+                      ? q.correctAnswerIndex
+                      : 0,
+              isFlashcard: isFlashcard,
               flashcardBack: flashcardBack,
-              questionType: _selectedMode.questionType,
+              questionType: questionType,
             );
       }
 
@@ -568,7 +588,9 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
                   style: TextStyle(fontSize: 13, color: subtitleColor),
                 ),
                 const SizedBox(height: 20),
-                ...QuizMode.values.map((mode) => _buildModeCard(mode, isDark)),
+                // Show all modes EXCEPT combine first, then combine last
+                ...[QuizMode.mcq, QuizMode.identification, QuizMode.enumeration, QuizMode.combine]
+                    .map((mode) => _buildModeCard(mode, isDark)),
               ],
             ),
           ),
@@ -802,6 +824,8 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
     final headerBg = isDark ? const Color(0xFF161A30) : Colors.grey.shade50;
     final headerBorder = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.grey.shade100;
     final titleColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+    // In combine mode, use per-question type; otherwise use the global mode.
+    final effectiveType = mode == QuizMode.combine ? q.selectedType : mode;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -843,21 +867,25 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: mode.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    mode.label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: mode.color,
+                // In combine mode: show a type-switcher dropdown; otherwise show static badge
+                if (mode == QuizMode.combine)
+                  _buildCombineTypeSwitcher(q, isDark)
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: effectiveType.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      effectiveType.label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: effectiveType.color,
+                      ),
                     ),
                   ),
-                ),
                 const Spacer(),
                 GestureDetector(
                   onTap: () => setState(() {
@@ -893,9 +921,9 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
                   maxLines: 2,
                   style: TextStyle(color: isDark ? Colors.white : const Color(0xFF1A1A2E)),
                   decoration: _inputDeco(
-                    mode == QuizMode.enumeration
+                    effectiveType == QuizMode.enumeration
                         ? 'Enter your question/instruction'
-                        : mode == QuizMode.identification
+                        : effectiveType == QuizMode.identification
                         ? 'What is this?'
                         : 'Enter your question',
                     Icons.help_outline_rounded,
@@ -903,7 +931,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
                   ),
                 ),
                 const SizedBox(height: 14),
-                _buildAnswerSection(index, q, mode, isDark),
+                _buildAnswerSection(index, q, effectiveType, isDark),
               ],
             ),
           ),
@@ -912,22 +940,43 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
     );
   }
 
+  /// Small inline type-switcher shown in Combine mode question card header.
+  Widget _buildCombineTypeSwitcher(QuestionFormData q, bool isDark) {
+    final types = [QuizMode.mcq, QuizMode.identification, QuizMode.enumeration];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: types.map((t) {
+        final isActive = q.selectedType == t;
+        return GestureDetector(
+          onTap: () => setState(() => q.selectedType = t),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.only(right: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: isActive ? t.color.withValues(alpha: 0.18) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isActive ? t.color : (isDark ? Colors.white24 : Colors.grey.shade300),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              t.label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
+                color: isActive ? t.color : (isDark ? Colors.white38 : Colors.grey.shade500),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildAnswerSection(int index, QuestionFormData q, QuizMode mode, bool isDark) {
     switch (mode) {
-      case QuizMode.flashcard:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _fieldLabel('Answer (Back of card)', isDark: isDark),
-            const SizedBox(height: 6),
-            TextFormField(
-              controller: q.backController,
-              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF1A1A2E)),
-              decoration: _inputDeco('Enter the answer', Icons.flip_rounded, isDark),
-            ),
-          ],
-        );
-
       case QuizMode.identification:
         final uploadBg = isDark ? const Color(0xFF161A30) : Colors.grey.shade50;
         final uploadBorder = isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey.shade200;
@@ -1081,6 +1130,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
         );
 
       case QuizMode.mcq:
+      case QuizMode.combine: // combine falls through to mcq UI (per-question type already resolved)
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

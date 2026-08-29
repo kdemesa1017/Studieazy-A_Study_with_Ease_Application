@@ -222,8 +222,8 @@ class _EditQuestionBottomSheetState
   void dispose() {
     _questionController.dispose();
     _backController.dispose();
-    for (final c in _optionControllers) c.dispose();
-    for (final c in _enumControllers) c.dispose();
+    for (final c in _optionControllers) { c.dispose(); }
+    for (final c in _enumControllers) { c.dispose(); }
     super.dispose();
   }
 
@@ -915,37 +915,28 @@ class _QuizDetailScreenState extends ConsumerState<QuizDetailScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          _questions.isEmpty
-                              ? null
-                              : () => context.push(
-                                '/study/flashcard/${widget.quizId}',
-                              ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      icon: const Icon(Icons.flip),
-                      label: const Text('Flashcards'),
+                    child: _StudyActionButton(
+                      label: 'Flashcards',
+                      subtitle: 'Review and memorize key concepts',
+                      icon: Icons.style_rounded,
+                      gradientColors: const [Color(0xFFFF8C00), Color(0xFFFF6B00)],
+                      shadowColor: Colors.orange,
+                      onPressed: _questions.isEmpty
+                          ? null
+                          : () => context.push('/study/flashcard/${widget.quizId}'),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          _questions.isEmpty
-                              ? null
-                              : () =>
-                                  context.push('/study/quiz/${widget.quizId}'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      icon: const Icon(Icons.quiz),
-                      label: const Text('Quiz Mode'),
+                    child: _StudyActionButton(
+                      label: 'Quiz Mode',
+                      subtitle: 'Test your knowledge with practice questions',
+                      icon: Icons.quiz_rounded,
+                      gradientColors: const [Color(0xFF22C55E), Color(0xFF16A34A)],
+                      shadowColor: Colors.green,
+                      onPressed: _questions.isEmpty
+                          ? null
+                          : () => context.push('/study/quiz/${widget.quizId}'),
                     ),
                   ),
                 ],
@@ -966,10 +957,13 @@ class _QuizDetailScreenState extends ConsumerState<QuizDetailScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: canEdit ? () => _showAddQuestionDialog() : null,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add'),
+                  MouseRegion(
+                    cursor: canEdit ? SystemMouseCursors.click : SystemMouseCursors.basic,
+                    child: TextButton.icon(
+                      onPressed: canEdit ? () => _showAddQuestionDialog() : null,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add Question'),
+                    ),
                   ),
                 ],
               ),
@@ -1030,58 +1024,66 @@ class _QuizDetailScreenState extends ConsumerState<QuizDetailScreen> {
     final canEdit =
         currentUser != null && _quiz != null && _quiz!.userId == currentUser.id;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: ListTile(
-        onTap: () => _editQuestion(question),
-        title: Text(
-          question.questionText,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          question.isEnumeration
-              ? '${question.options.length} items to enumerate'
-              : question.isIdentification
-                  ? 'Identification'
-                  : question.isFlashcard
-                      ? 'Flashcard'
-                      : '${question.options.length} options',
-        ),
-        leading: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: question.isEnumeration
-                ? Colors.orange.withValues(alpha: 0.2)
-                : question.isIdentification
-                    ? Colors.teal.withValues(alpha: 0.2)
-                    : question.isFlashcard
-                        ? Colors.purple.withValues(alpha: 0.2)
-                        : Colors.blue.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
+    return MouseRegion(
+      cursor: canEdit ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: ListTile(
+          onTap: canEdit ? () => _editQuestion(question) : null,
+          title: Text(
+            question.questionText,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          child: Icon(
+          subtitle: Text(
             question.isEnumeration
-                ? Icons.format_list_numbered_rounded
+                ? '${question.options.length} items to enumerate'
                 : question.isIdentification
-                    ? Icons.edit_note_rounded
+                    ? 'Identification'
                     : question.isFlashcard
-                        ? Icons.flip
-                        : Icons.help_outline,
-            size: 20,
-            color: question.isEnumeration
-                ? Colors.orange
-                : question.isIdentification
-                    ? Colors.teal
-                    : question.isFlashcard
-                        ? Colors.purple
-                        : Colors.blue,
+                        ? 'Flashcard'
+                        : '${question.options.length} options',
           ),
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.red),
-          onPressed: canEdit ? () => _deleteQuestion(question.id) : null,
+          leading: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: question.isEnumeration
+                  ? Colors.orange.withValues(alpha: 0.2)
+                  : question.isIdentification
+                      ? Colors.teal.withValues(alpha: 0.2)
+                      : question.isFlashcard
+                          ? Colors.purple.withValues(alpha: 0.2)
+                          : Colors.blue.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              question.isEnumeration
+                  ? Icons.format_list_numbered_rounded
+                  : question.isIdentification
+                      ? Icons.edit_note_rounded
+                      : question.isFlashcard
+                          ? Icons.flip
+                          : Icons.help_outline,
+              size: 20,
+              color: question.isEnumeration
+                  ? Colors.orange
+                  : question.isIdentification
+                      ? Colors.teal
+                      : question.isFlashcard
+                          ? Colors.purple
+                          : Colors.blue,
+            ),
+          ),
+          trailing: canEdit
+              ? MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () => _deleteQuestion(question.id),
+                  ),
+                )
+              : null,
         ),
       ),
     );
@@ -1157,7 +1159,7 @@ class _AddQuestionBottomSheetState
     TextEditingController(),
   ];
   // For enumeration items (dynamic list)
-  List<TextEditingController> _enumControllers = [
+  final List<TextEditingController> _enumControllers = [
     TextEditingController(),
     TextEditingController(),
     TextEditingController(),
@@ -1170,8 +1172,8 @@ class _AddQuestionBottomSheetState
   void dispose() {
     _questionController.dispose();
     _backController.dispose();
-    for (var c in _optionControllers) c.dispose();
-    for (var c in _enumControllers) c.dispose();
+    for (var c in _optionControllers) { c.dispose(); }
+    for (var c in _enumControllers) { c.dispose(); }
     super.dispose();
   }
 
@@ -1429,5 +1431,108 @@ class _AddQuestionBottomSheetState
           ),
         );
     }
+  }
+}
+
+/// Gradient pill-style action button for Flashcards / Quiz Mode.
+class _StudyActionButton extends StatelessWidget {
+  final String label;
+  final String? subtitle;
+  final IconData icon;
+  final List<Color> gradientColors;
+  final Color shadowColor;
+  final VoidCallback? onPressed;
+
+  const _StudyActionButton({
+    required this.label,
+    this.subtitle,
+    required this.icon,
+    required this.gradientColors,
+    required this.shadowColor,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDisabled = onPressed == null;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        mouseCursor: isDisabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedOpacity(
+          opacity: isDisabled ? 0.45 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: gradientColors,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: isDisabled
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: shadowColor.withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.20),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

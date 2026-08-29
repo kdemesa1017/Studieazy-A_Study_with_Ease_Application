@@ -96,6 +96,24 @@ class _QuizStudyScreenState extends ConsumerState<QuizStudyScreen> {
     });
   }
 
+  void _shuffleQuestionsList() {
+    setState(() {
+      _shuffledQuestions.shuffle();
+      _currentIndex = 0;
+      _score = 0;
+      _hasAnswered = false;
+      _selectedAnswer = null;
+      _userAnswers.clear();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Questions shuffled!'),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _selectAnswer(int index) {
     if (_hasAnswered) return;
 
@@ -187,7 +205,7 @@ class _QuizStudyScreenState extends ConsumerState<QuizStudyScreen> {
         _isTextAnswerCorrect = null;
         _textInputController.clear();
         // Dispose old enum controllers, replace with new
-        for (final c in _enumControllers) c.dispose();
+        for (final c in _enumControllers) { c.dispose(); }
         _enumControllers = newControllers;
         _enumCorrectness = [];
       });
@@ -311,7 +329,7 @@ class _QuizStudyScreenState extends ConsumerState<QuizStudyScreen> {
       _isTextAnswerCorrect = null;
       _userAnswers = [];
       _textInputController.clear();
-      for (final c in _enumControllers) c.dispose();
+      for (final c in _enumControllers) { c.dispose(); }
       _enumControllers = newControllers;
       _enumCorrectness = [];
       _shuffledQuestions.shuffle();
@@ -368,11 +386,31 @@ class _QuizStudyScreenState extends ConsumerState<QuizStudyScreen> {
         title: const Text('Quiz Mode'),
         actions: [
           Center(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Text(
-                '${_currentIndex + 1}/${_shuffledQuestions.length}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+            child: Text(
+              '${_currentIndex + 1}/${_shuffledQuestions.length}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: InkWell(
+              onTap: _shuffleQuestionsList,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Icon(
+                  Icons.shuffle_rounded,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
             ),
           ),
@@ -557,14 +595,39 @@ class _QuizStudyScreenState extends ConsumerState<QuizStudyScreen> {
           TextField(
             controller: _textInputController,
             enabled: !_hasAnswered,
+            minLines: 1,
+            maxLines: 4,
+            keyboardType: TextInputType.multiline,
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
             ),
             decoration: InputDecoration(
-              hintText: 'e.g., Phishing',
+              hintText: 'Type your answer here...',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '• Enter key terms or definition. Text automatically wraps to the next line.',
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
             ),
           ),
           const SizedBox(height: 16),
@@ -614,47 +677,55 @@ class _QuizStudyScreenState extends ConsumerState<QuizStudyScreen> {
         const SizedBox(height: 12),
         ...List.generate(expectedItems.length, (i) {
           // After answering, colour each field border based on correctness
-          Color borderColor = Colors.grey.shade400;
+          Color borderColor = Theme.of(context).colorScheme.outline.withValues(alpha: 0.5);
           if (_hasAnswered && i < _enumCorrectness.length) {
             borderColor = _enumCorrectness[i] ? Colors.green : Colors.red;
           }
           return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: TextField(
-              controller:
-                  i < _enumControllers.length ? _enumControllers[i] : null,
-              enabled: !_hasAnswered,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              decoration: InputDecoration(
-                labelText: 'Item ${i + 1}',
-                hintText: 'e.g., ${expectedItems[i]}',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: borderColor),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: borderColor, width: 1.5),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Theme.of(context).colorScheme.primary,
-                    width: 2,
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller:
+                      i < _enumControllers.length ? _enumControllers[i] : null,
+                  enabled: !_hasAnswered,
+                  minLines: 1,
+                  maxLines: 3,
+                  keyboardType: TextInputType.multiline,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Item ${i + 1}',
+                    hintText: 'e.g., ${expectedItems[i]}',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: borderColor, width: 1.5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    suffixIcon: _hasAnswered && i < _enumCorrectness.length
+                        ? Icon(
+                            _enumCorrectness[i]
+                                ? Icons.check_circle
+                                : Icons.cancel,
+                            color:
+                                _enumCorrectness[i] ? Colors.green : Colors.red,
+                          )
+                        : null,
                   ),
                 ),
-                suffixIcon: _hasAnswered && i < _enumCorrectness.length
-                    ? Icon(
-                        _enumCorrectness[i]
-                            ? Icons.check_circle
-                            : Icons.cancel,
-                        color:
-                            _enumCorrectness[i] ? Colors.green : Colors.red,
-                      )
-                    : null,
-              ),
+              ],
             ),
           );
         }),

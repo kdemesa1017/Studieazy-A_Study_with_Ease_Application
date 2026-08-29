@@ -1,0 +1,8 @@
+{
+  "name": "selfstudy-reset-api",
+  "version": "1.0.0",
+  "description": "Password reset API for Self Study app",
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

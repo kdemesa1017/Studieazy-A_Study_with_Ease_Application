@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/quiz_provider.dart';
 import '../../models/quiz_model.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/responsive_layout.dart';
 
 class MyQuizzesScreen extends ConsumerStatefulWidget {
   const MyQuizzesScreen({super.key});
@@ -432,6 +433,22 @@ class _MyQuizzesScreenState extends ConsumerState<MyQuizzesScreen> {
                     // ── Quiz List ────────────────────────────────────────────
                     if (filteredList.isEmpty)
                       _buildEmptyListState(context, isDark)
+                    else if (ResponsiveBreakpoints.isDesktop(context))
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 1.15,
+                        ),
+                        itemCount: filteredList.length,
+                        itemBuilder: (context, index) {
+                          final quiz = filteredList[index];
+                          return _buildQuizCard(context, quiz, user.id, isDark);
+                        },
+                      )
                     else
                       ListView.builder(
                         shrinkWrap: true,

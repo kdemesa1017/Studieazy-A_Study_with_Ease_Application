@@ -19,6 +19,11 @@ class UserModel {
   final DateTime createdAt;
   final DateTime? lastSyncedAt;
 
+  /// True once the user has entered the correct 6-digit OTP sent to their
+  /// email during registration. Accounts are not considered fully
+  /// authenticated in the app until this is true.
+  final bool otpVerified;
+
   // ── Streak fields ────────────────────────────────────────────────────────────
 
   /// Consecutive days the user has opened the app.
@@ -45,6 +50,7 @@ class UserModel {
     this.gradeLevel,
     required this.createdAt,
     this.lastSyncedAt,
+    this.otpVerified = false,
     this.streakCount = 0,
     this.lastStreakDate,
     this.pendingStreakSync = false,
@@ -64,6 +70,7 @@ class UserModel {
       'gradeLevel': gradeLevel,
       'createdAt': createdAt.toIso8601String(),
       'lastSyncedAt': lastSyncedAt?.toIso8601String(),
+      'otpVerified': otpVerified,
       'streakCount': streakCount,
       'lastStreakDate': lastStreakDate,
       // pendingStreakSync is local-only; never written to Firestore
@@ -87,6 +94,7 @@ class UserModel {
           data['lastSyncedAt'] != null
               ? DateTime.parse(data['lastSyncedAt'] as String)
               : null,
+      otpVerified: (data['otpVerified'] as bool?) ?? false,
       streakCount: (data['streakCount'] as int?) ?? 0,
       lastStreakDate: data['lastStreakDate'] as String?,
       pendingStreakSync: false,
@@ -106,6 +114,7 @@ class UserModel {
     String? gradeLevel,
     DateTime? createdAt,
     DateTime? lastSyncedAt,
+    bool? otpVerified,
     int? streakCount,
     String? lastStreakDate,
     bool? pendingStreakSync,
@@ -123,6 +132,7 @@ class UserModel {
       gradeLevel: gradeLevel ?? this.gradeLevel,
       createdAt: createdAt ?? this.createdAt,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      otpVerified: otpVerified ?? this.otpVerified,
       streakCount: streakCount ?? this.streakCount,
       lastStreakDate: lastStreakDate ?? this.lastStreakDate,
       pendingStreakSync: pendingStreakSync ?? this.pendingStreakSync,

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/quiz_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -64,10 +65,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _bioController = TextEditingController(text: user?.bio ?? '');
     _phoneController = TextEditingController(text: '+63 912 345 6789');
     _birthdayController = TextEditingController(text: 'July 30, 2005');
+
+    _nameController.addListener(_onFieldChanged);
+    _ageController.addListener(_onFieldChanged);
+    _addressController.addListener(_onFieldChanged);
+    _bioController.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    if (mounted) setState(() {});
+  }
+
+  bool _hasChanges(UserModel? user) {
+    if (user == null) return false;
+    if (_selectedImageBytes != null) return true;
+    if (_nameController.text.trim() != (user.name)) return true;
+    if (_ageController.text.trim() != (user.age?.toString() ?? '')) return true;
+    if (_addressController.text.trim() != (user.address ?? '')) return true;
+    if (_bioController.text.trim() != (user.bio ?? '')) return true;
+    return false;
   }
 
   @override
   void dispose() {
+    _nameController.removeListener(_onFieldChanged);
+    _ageController.removeListener(_onFieldChanged);
+    _addressController.removeListener(_onFieldChanged);
+    _bioController.removeListener(_onFieldChanged);
     _nameController.dispose();
     _ageController.dispose();
     _addressController.dispose();
@@ -257,6 +281,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    final user = ref.read(currentUserProvider).valueOrNull;
+    if (!_hasChanges(user)) return;
+
     final nameText = _nameController.text.trim();
     if (nameText.isEmpty) {
       await _showResultModal('Validation Error', 'Please enter your full name.', false);
@@ -742,10 +769,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _saveProfile,
+                onPressed: (_isLoading || !_hasChanges(user)) ? null : _saveProfile,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF5C4EE8),
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  disabledForegroundColor: Colors.grey.shade600,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 child: _isLoading
@@ -1134,7 +1163,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 12),
                 Text('Self Study', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827))),
                 const SizedBox(height: 4),
-                Text('Version 1.0.0', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade500)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5C4EE8).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF5C4EE8).withValues(alpha: 0.3)),
+                  ),
+                  child: const Text(
+                    'V0.3.1 (Beta App)',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF5C4EE8)),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Text('© 2026 Self Study. All rights reserved.', style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade400)),
               ],
@@ -1282,6 +1322,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               controller: controller,
               readOnly: readOnly,
               keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+              inputFormatters: isNumber ? [FilteringTextInputFormatter.digitsOnly] : null,
               style: TextStyle(fontSize: 14, color: titleColor, fontWeight: FontWeight.w500),
               decoration: InputDecoration(
                 labelText: label,
