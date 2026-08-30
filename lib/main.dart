@@ -41,5 +41,5 @@ void main() async {
   await Hive.initFlutter();
   await LocalQuizStore.init();
 
-  runApp(const ProviderScope(child: SelfStudyApp()));
+  runApp(const ProviderScope(child: StudieazyApp()));
 }

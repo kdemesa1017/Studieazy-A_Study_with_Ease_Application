@@ -118,16 +118,22 @@ class AuthService {
         );
         if (user != null) return user;
 
-        return UserModel(
+        final newUser = UserModel(
           id: result.user!.uid,
           email: email,
           name: result.user!.displayName ?? email.split('@')[0],
           createdAt: DateTime.now(),
-          // Accounts created before the OTP feature existed, or restored
-          // without a Firestore doc, are treated as already verified so
-          // existing users are not locked out.
           otpVerified: true,
         );
+
+        try {
+          await _firestore
+              .collection('users')
+              .doc(newUser.id)
+              .set(newUser.toFirestore(), SetOptions(merge: true));
+        } catch (_) {}
+
+        return newUser;
       }
     } on FirebaseAuthException catch (e) {
       throw _handleAuthError(e);
@@ -137,6 +143,18 @@ class AuthService {
 
   Future<void> signOut() async {
     await _auth.signOut();
+  }
+
+  /// Records the current timestamp as [lastActiveAt] for the given user.
+  /// Fire-and-forget — callers should NOT await this.
+  Future<void> updateLastActive(String uid) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'lastActiveAt': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {
+      // Best-effort; ignore offline errors.
+    }
   }
 
   /// Marks the given user's account as OTP-verified in Firestore.

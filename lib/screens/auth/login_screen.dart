@@ -1051,7 +1051,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         ),
                         const SizedBox(width: 16),
                         const Text(
-                          'SelfStudy',
+                          'Studieazy',
                           style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w900,
@@ -1124,7 +1124,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   text: const TextSpan(
                                     children: [
                                       TextSpan(
-                                        text: 'Self ',
+                                        text: 'Studi',
                                         style: TextStyle(
                                           fontSize: 32,
                                           fontWeight: FontWeight.w900,
@@ -1132,7 +1132,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         ),
                                       ),
                                       TextSpan(
-                                        text: 'Study',
+                                        text: 'eazy',
                                         style: TextStyle(
                                           fontSize: 32,
                                           fontWeight: FontWeight.w900,
@@ -1239,7 +1239,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           text: const TextSpan(
                             children: [
                               TextSpan(
-                                text: 'Self ',
+                                text: 'Studi',
                                 style: TextStyle(
                                   fontSize: 28,
                                   fontWeight: FontWeight.w900,
@@ -1247,7 +1247,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 ),
                               ),
                               TextSpan(
-                                text: 'Study',
+                                text: 'eazy',
                                 style: TextStyle(
                                   fontSize: 28,
                                   fontWeight: FontWeight.w900,

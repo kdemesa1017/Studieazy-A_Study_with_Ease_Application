@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/responsive_layout.dart';
+import '../../widgets/legal_policy_dialog.dart';
 
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     with TickerProviderStateMixin {
   int _currentStep = 1; // 1=Welcome, 2=PersonalInfo, 3=AccountDetails, 4=OTP, 5=Success
   bool _isLoading = false;
+  bool _agreedToPolicy = false;
 
   final _formKeyStep2 = GlobalKey<FormState>();
   final _formKeyStep3 = GlobalKey<FormState>();
@@ -125,6 +127,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     }
     if (_currentStep == 3) {
       if (_formKeyStep3.currentState?.validate() ?? false) {
+        if (!_agreedToPolicy) {
+          _showError('Please accept the Terms of Service & Privacy Policy to continue.');
+          return;
+        }
         FocusScope.of(context).unfocus();
         _sendOTP();
       }
@@ -543,7 +549,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             children: [
               TextSpan(text: 'Create your account to start learning\nsmarter with '),
               TextSpan(
-                text: 'Self Study',
+                text: 'Studieazy',
                 style: TextStyle(
                   color: _kPrimary,
                   fontWeight: FontWeight.bold,
@@ -817,6 +823,81 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                     if (v != _passwordController.text) return 'Passwords do not match';
                     return null;
                   },
+                ),
+                const SizedBox(height: 18),
+
+                // Terms of Service & Privacy Policy Acceptance
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _agreedToPolicy
+                        ? _kPrimary.withValues(alpha: 0.05)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _agreedToPolicy
+                          ? _kPrimary.withValues(alpha: 0.3)
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: _agreedToPolicy,
+                          activeColor: _kPrimary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          onChanged: (val) {
+                            setState(() => _agreedToPolicy = val ?? false);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            const Text(
+                              'I agree to the ',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _kTextDark,
+                                height: 1.4,
+                              ),
+                            ),
+                            MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: GestureDetector(
+                                onTap: () {
+                                  LegalPolicyDialog.show(
+                                    context,
+                                    onAccept: () {
+                                      setState(() => _agreedToPolicy = true);
+                                    },
+                                  );
+                                },
+                                child: const Text(
+                                  'Terms of Service & Privacy Policy',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: _kPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    decoration: TextDecoration.underline,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

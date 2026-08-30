@@ -9,6 +9,9 @@ import '../../providers/auth_provider.dart';
 import '../../providers/quiz_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/legal_policy_dialog.dart';
+import '../../widgets/admin_2fa_dialog.dart';
+import '../../services/admin_service.dart';
 
 enum ProfileSubView {
   main,
@@ -459,7 +462,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       case ProfileSubView.accountSecurity:
         return _buildAccountSecurity(user, isDark);
       case ProfileSubView.helpSupport:
-        return _buildHelpSupport(isDark);
+        return _buildHelpSupport(user, isDark);
     }
   }
 
@@ -614,6 +617,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             title: 'Account & Security',
             subtitle: 'Manage your account and security',
             onTap: () => setState(() => _currentView = ProfileSubView.accountSecurity),
+            isDark: isDark,
+          ),
+          if (user.isAdmin)
+            _adminMenuTile(
+              icon: Icons.admin_panel_settings_rounded,
+              title: 'Admin Control Center',
+              subtitle: 'System health, errors, support tickets & backups',
+              onTap: () {
+                Admin2faDialog.show(
+                  context,
+                  adminUser: user,
+                  onVerified: () => context.go('/admin'),
+                );
+              },
+              isDark: isDark,
+            ),
+          _menuTile(
+            icon: Icons.policy_outlined,
+            title: 'Terms & Privacy Policy',
+            subtitle: 'Terms of service, AI data processing & user rights',
+            onTap: () => LegalPolicyDialog.show(context),
             isDark: isDark,
           ),
           _menuTile(
@@ -897,9 +921,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             child: Column(
               children: [
-                _settingRow('Rate Self Study', '', Icons.star_outline_rounded, isDark, onTap: () => _comingSoon('Rate Self Study')),
+                _settingRow('Rate Studieazy', '', Icons.star_outline_rounded, isDark, onTap: () => _comingSoon('Rate Studieazy')),
                 _divider(isDark),
-                _settingRow('Share Self Study', '', Icons.share_outlined, isDark, onTap: () => _comingSoon('Share Self Study')),
+                _settingRow('Share Studieazy', '', Icons.share_outlined, isDark, onTap: () => _comingSoon('Share Studieazy')),
               ],
             ),
           ),
@@ -1087,7 +1111,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // ── 6. Help & Support Sub-Page ────────────────────────────────────────────
 
-  Widget _buildHelpSupport(bool isDark) {
+  Widget _buildHelpSupport(dynamic user, bool isDark) {
     final cardBg = isDark ? const Color(0xFF1A1F38) : Colors.white;
 
     return SingleChildScrollView(
@@ -1110,9 +1134,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               children: [
                 _settingRow('Frequently Asked Questions', 'Find answers to common questions', Icons.help_outline_rounded, isDark, onTap: () => _comingSoon('FAQ')),
                 _divider(isDark),
-                _settingRow('Contact Support', "We're here to help you", Icons.support_agent_rounded, isDark, onTap: () => _comingSoon('Contact Support')),
+                _settingRow('Contact Support', "We're here to help you", Icons.support_agent_rounded, isDark, onTap: () => _showSupportTicketDialog(context, 'Account / Support', user, isDark)),
                 _divider(isDark),
-                _settingRow('Report a Bug', 'Help us improve the app', Icons.bug_report_outlined, isDark, onTap: () => _comingSoon('Report Bug')),
+                _settingRow('Report a Bug', 'Help us improve the app', Icons.bug_report_outlined, isDark, onTap: () => _showSupportTicketDialog(context, 'Bug / Error', user, isDark)),
               ],
             ),
           ),
@@ -1130,9 +1154,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               children: [
                 _settingRow('User Guide', 'Learn how to use the app', Icons.article_outlined, isDark, onTap: () => _comingSoon('User Guide')),
                 _divider(isDark),
-                _settingRow('Privacy Policy', 'Read our privacy policy', Icons.privacy_tip_outlined, isDark, onTap: () => _comingSoon('Privacy Policy')),
+                _settingRow('Privacy Policy', 'Read our privacy policy', Icons.privacy_tip_outlined, isDark, onTap: () => LegalPolicyDialog.show(context)),
                 _divider(isDark),
-                _settingRow('Terms of Service', 'Read our terms of service', Icons.description_outlined, isDark, onTap: () => _comingSoon('Terms of Service')),
+                _settingRow('Terms of Service', 'Read our terms of service', Icons.description_outlined, isDark, onTap: () => LegalPolicyDialog.show(context)),
               ],
             ),
           ),
@@ -1161,7 +1185,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   child: const Icon(Icons.school_rounded, color: Colors.white, size: 36),
                 ),
                 const SizedBox(height: 12),
-                Text('Self Study', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827))),
+                Text('Studieazy', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827))),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1176,13 +1200,163 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text('© 2026 Self Study. All rights reserved.', style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade400)),
+                Text('© 2026 Studieazy. All rights reserved.', style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.grey.shade400)),
               ],
             ),
           ),
           const SizedBox(height: 20),
         ],
       ),
+    );
+  }
+
+  void _showSupportTicketDialog(BuildContext context, String defaultCategory, dynamic user, bool isDark) {
+    final subjectCtrl = TextEditingController();
+    final messageCtrl = TextEditingController();
+    String selectedCategory = defaultCategory;
+    bool isSubmitting = false;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Submit Support Request',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedCategory,
+                      decoration: InputDecoration(
+                        labelText: 'Category',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Bug / Error', child: Text('Bug / Error Report')),
+                        DropdownMenuItem(value: 'Account / Support', child: Text('Account / Login Issue')),
+                        DropdownMenuItem(value: 'Flashcard / Quiz', child: Text('Flashcard / Quiz Problem')),
+                        DropdownMenuItem(value: 'Feature Request', child: Text('Feature Request')),
+                        DropdownMenuItem(value: 'Other', child: Text('Other Feedback')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setSheetState(() => selectedCategory = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: subjectCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Subject',
+                        hintText: 'Brief summary of the issue...',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: messageCtrl,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        labelText: 'Description',
+                        hintText: 'Provide details so we can fix it quickly...',
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF5C4EE8),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                if (subjectCtrl.text.trim().isEmpty || messageCtrl.text.trim().isEmpty) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    const SnackBar(content: Text('Please enter a subject and message.')),
+                                  );
+                                  return;
+                                }
+
+                                setSheetState(() => isSubmitting = true);
+                                try {
+                                  await AdminService.createTicket(
+                                    userId: user?.id ?? 'guest',
+                                    userEmail: user?.email ?? 'unknown@studieazy.app',
+                                    userName: user?.name ?? 'User',
+                                    subject: subjectCtrl.text.trim(),
+                                    message: messageCtrl.text.trim(),
+                                    category: selectedCategory,
+                                  );
+                                  if (ctx.mounted) {
+                                    Navigator.of(ctx).pop();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Support ticket sent! Admin will review it soon.')),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (ctx.mounted) {
+                                    setSheetState(() => isSubmitting = false);
+                                    ScaffoldMessenger.of(ctx).showSnackBar(
+                                      SnackBar(content: Text('Failed to submit: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                        child: isSubmitting
+                            ? const SizedBox(
+                                width: 20, height: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Text('Send Report to Support', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1239,6 +1413,75 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       width: 1,
       height: 30,
       color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.shade200,
+    );
+  }
+
+  Widget _adminMenuTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF312E81).withValues(alpha: 0.5), const Color(0xFF1E1B4B).withValues(alpha: 0.5)]
+              : [const Color(0xFFEEECFF), const Color(0xFFF5F3FF)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.5)),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: Colors.white, size: 22),
+        ),
+        title: Row(
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: isDark ? Colors.white : const Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6366F1).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'ADMIN ONLY',
+                style: TextStyle(
+                  color: Color(0xFF6366F1),
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6366F1)),
+      ),
     );
   }
 

@@ -19,6 +19,9 @@ class UserModel {
   final DateTime createdAt;
   final DateTime? lastSyncedAt;
 
+  /// Timestamp of the last time this user opened/used the app.
+  final DateTime? lastActiveAt;
+
   /// True once the user has entered the correct 6-digit OTP sent to their
   /// email during registration. Accounts are not considered fully
   /// authenticated in the app until this is true.
@@ -37,6 +40,18 @@ class UserModel {
   /// to Firestore yet.
   final bool pendingStreakSync;
 
+  /// User access role: 'user' | 'admin' | 'superadmin'
+  final String role;
+
+  bool get isAdmin =>
+      role == 'admin' ||
+      role == 'superadmin' ||
+      email.toLowerCase() == 'demesakurtdaryl@gmail.com';
+
+  bool get isSuperAdmin =>
+      role == 'superadmin' ||
+      email.toLowerCase() == 'demesakurtdaryl@gmail.com';
+
   UserModel({
     required this.id,
     required this.email,
@@ -50,10 +65,12 @@ class UserModel {
     this.gradeLevel,
     required this.createdAt,
     this.lastSyncedAt,
+    this.lastActiveAt,
     this.otpVerified = false,
     this.streakCount = 0,
     this.lastStreakDate,
     this.pendingStreakSync = false,
+    this.role = 'user',
   });
 
   Map<String, dynamic> toFirestore() {
@@ -70,34 +87,43 @@ class UserModel {
       'gradeLevel': gradeLevel,
       'createdAt': createdAt.toIso8601String(),
       'lastSyncedAt': lastSyncedAt?.toIso8601String(),
+      'lastActiveAt': lastActiveAt?.toIso8601String(),
       'otpVerified': otpVerified,
       'streakCount': streakCount,
       'lastStreakDate': lastStreakDate,
+      'role': role,
       // pendingStreakSync is local-only; never written to Firestore
     };
   }
 
   factory UserModel.fromFirestore(Map<String, dynamic> data) {
+    DateTime parseDate(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is String) {
+        return DateTime.tryParse(value) ?? DateTime.now();
+      }
+      return DateTime.now();
+    }
+
     return UserModel(
-      id: data['id'] as String,
-      email: data['email'] as String,
-      name: data['name'] as String,
+      id: (data['id'] as String?) ?? '',
+      email: (data['email'] as String?) ?? '',
+      name: (data['name'] as String?) ?? 'User',
       profileImageUrl: data['profileImageUrl'] as String?,
       profileImageBase64: data['profileImageBase64'] as String?,
-      age: data['age'] as int?,
+      age: data['age'] is int ? data['age'] as int : int.tryParse(data['age']?.toString() ?? ''),
       address: data['address'] as String?,
       bio: data['bio'] as String?,
       school: data['school'] as String?,
       gradeLevel: data['gradeLevel'] as String?,
-      createdAt: DateTime.parse(data['createdAt'] as String),
-      lastSyncedAt:
-          data['lastSyncedAt'] != null
-              ? DateTime.parse(data['lastSyncedAt'] as String)
-              : null,
+      createdAt: parseDate(data['createdAt']),
+      lastSyncedAt: data['lastSyncedAt'] != null ? parseDate(data['lastSyncedAt']) : null,
+      lastActiveAt: data['lastActiveAt'] != null ? parseDate(data['lastActiveAt']) : null,
       otpVerified: (data['otpVerified'] as bool?) ?? false,
-      streakCount: (data['streakCount'] as int?) ?? 0,
+      streakCount: data['streakCount'] is int ? data['streakCount'] as int : int.tryParse(data['streakCount']?.toString() ?? '') ?? 0,
       lastStreakDate: data['lastStreakDate'] as String?,
       pendingStreakSync: false,
+      role: (data['role'] as String?) ?? 'user',
     );
   }
 
@@ -114,10 +140,12 @@ class UserModel {
     String? gradeLevel,
     DateTime? createdAt,
     DateTime? lastSyncedAt,
+    DateTime? lastActiveAt,
     bool? otpVerified,
     int? streakCount,
     String? lastStreakDate,
     bool? pendingStreakSync,
+    String? role,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -132,10 +160,12 @@ class UserModel {
       gradeLevel: gradeLevel ?? this.gradeLevel,
       createdAt: createdAt ?? this.createdAt,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       otpVerified: otpVerified ?? this.otpVerified,
       streakCount: streakCount ?? this.streakCount,
       lastStreakDate: lastStreakDate ?? this.lastStreakDate,
       pendingStreakSync: pendingStreakSync ?? this.pendingStreakSync,
+      role: role ?? this.role,
     );
   }
 }

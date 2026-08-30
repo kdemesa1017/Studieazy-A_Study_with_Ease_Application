@@ -91,7 +91,7 @@ class WebNavbar extends ConsumerWidget implements PreferredSizeWidget {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'SelfStudy',
+                        'Studieazy',
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,

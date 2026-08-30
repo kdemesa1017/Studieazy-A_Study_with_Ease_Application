@@ -15,6 +15,7 @@ import 'screens/study/quiz_study_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/main_layout.dart';
 import 'screens/ai_quiz/ai_quiz_generator_screen.dart';
+import 'screens/admin/admin_dashboard_screen.dart';
 
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
@@ -120,12 +121,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminDashboardScreen(),
+      ),
     ],
   );
 });
 
-class SelfStudyApp extends ConsumerWidget {
-  const SelfStudyApp({super.key});
+class StudieazyApp extends ConsumerWidget {
+  const StudieazyApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -133,7 +138,7 @@ class SelfStudyApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'Self Study',
+      title: 'Studieazy',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: ThemeData(

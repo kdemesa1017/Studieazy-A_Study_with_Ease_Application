@@ -212,8 +212,11 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     try {
       final user = await _authService.signIn(email: email, password: password);
       if (user == null) return 'Authentication failed. Please try again.';
-      state = AsyncData(user);
-      await _localUserStore.save(user);
+      final userWithActivity = user.copyWith(lastActiveAt: DateTime.now());
+      state = AsyncData(userWithActivity);
+      await _localUserStore.save(userWithActivity);
+      // Update lastActiveAt in Firestore (best-effort, won't block login)
+      _authService.updateLastActive(user.id);
       return null;
     } catch (e) {
       return e.toString();
