@@ -239,117 +239,137 @@ class _SweetAlertState extends State<SweetAlert> with SingleTickerProviderStateM
 
     return ScaleTransition(
       scale: _scaleAnim,
-      child: Dialog(
-        backgroundColor: dialogBg,
-        elevation: 16,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildAnimatedIcon(),
-                const SizedBox(height: 20),
-                Text(
-                  widget.title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: titleColor,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                if (widget.subtitle != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    widget.subtitle!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      height: 1.45,
-                      color: subtitleColor,
-                    ),
-                  ),
-                ],
-                if (widget.customContent != null) ...[
-                  const SizedBox(height: 16),
-                  widget.customContent!,
-                ],
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    if (widget.showCancelButton) ...[
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(
-                              color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          onPressed: () {
-                            if (widget.onCancel != null) {
-                              widget.onCancel!();
-                            } else {
-                              Navigator.of(context).pop(false);
-                            }
-                          },
-                          child: Text(
-                            widget.cancelButtonText ?? 'Cancel',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: subtitleColor,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: widget.confirmButtonColor ?? _primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        onPressed: () {
-                          if (widget.onConfirm != null) {
-                            widget.onConfirm!();
-                          } else {
-                            Navigator.of(context).pop(true);
-                          }
-                        },
-                        child: Text(
-                          widget.confirmButtonText,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+      child: Center(
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            width: 380,
+            constraints: const BoxConstraints(maxWidth: 380),
+            decoration: BoxDecoration(
+              color: dialogBg,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : const Color(0xFFE2E8F0),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.40 : 0.15),
+                  blurRadius: 32,
+                  offset: const Offset(0, 12),
                 ),
               ],
             ),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildAnimatedIcon(),
+                  const SizedBox(height: 20),
+                  Text(
+                    widget.title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: titleColor,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  if (widget.subtitle != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      widget.subtitle!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: subtitleColor,
+                      ),
+                    ),
+                  ],
+                  if (widget.customContent != null) ...[
+                    const SizedBox(height: 16),
+                    widget.customContent!,
+                  ],
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      if (widget.showCancelButton) ...[
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: BorderSide(
+                                color: isDark
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFCBD5E1),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () {
+                              if (widget.onCancel != null) {
+                                widget.onCancel!();
+                              } else {
+                                Navigator.of(context).pop(false);
+                              }
+                            },
+                            child: Text(
+                              widget.cancelButtonText ?? 'Cancel',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: subtitleColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                widget.confirmButtonColor ?? _primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            shadowColor: (widget.confirmButtonColor ?? _primaryColor)
+                                .withValues(alpha: 0.4),
+                          ),
+                          onPressed: () {
+                            if (widget.onConfirm != null) {
+                              widget.onConfirm!();
+                            } else {
+                              Navigator.of(context).pop(true);
+                            }
+                          },
+                          child: Text(
+                            widget.confirmButtonText,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
-    );
+      );
   }
 }

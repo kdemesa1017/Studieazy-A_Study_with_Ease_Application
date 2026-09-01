@@ -39,19 +39,46 @@ class OtpService {
       'createdAt': DateTime.now().toIso8601String(),
     });
 
-    final response = await http.post(
-      Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'service_id': _emailJsServiceId,
-        'template_id': _emailJsTemplateId,
-        'user_id': _emailJsPublicKey,
-        'template_params': {'to_email': email, 'otp_code': code},
-      }),
-    );
+    await _sendEmailWithRetry(email: email, code: code);
+  }
 
-    if (response.statusCode != 200) {
-      throw 'Failed to send verification email. Please try again.';
+  /// Sends email via EmailJS with automatic retry and progressive backoff (1-3s delays).
+  /// This protects against concurrent request spikes, rate limits, and network blips.
+  Future<void> _sendEmailWithRetry({
+    required String email,
+    required String code,
+    int maxAttempts = 3,
+  }) async {
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        final response = await http.post(
+          Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'service_id': _emailJsServiceId,
+            'template_id': _emailJsTemplateId,
+            'user_id': _emailJsPublicKey,
+            'template_params': {'to_email': email.trim(), 'otp_code': code},
+          }),
+        ).timeout(const Duration(seconds: 10));
+
+        if (response.statusCode == 200) {
+          return; // Success!
+        }
+
+        // If rate-limited or server busy, delay 1s to 3s before retry
+        if (attempt < maxAttempts) {
+          await Future.delayed(Duration(milliseconds: 1000 * attempt));
+        } else {
+          throw 'Failed to send verification email (${response.statusCode}). Please try again.';
+        }
+      } catch (e) {
+        if (attempt >= maxAttempts) {
+          if (e is String) rethrow;
+          throw 'Failed to send verification email. Please check your internet connection and try again.';
+        }
+        await Future.delayed(Duration(milliseconds: 1000 * attempt));
+      }
     }
   }
 
@@ -109,21 +136,8 @@ class OtpService {
       throw 'Failed to prepare verification code. Please try again.';
     }
 
-    // 3. Send OTP email via EmailJS directly from the app (this always worked)
-    final emailResponse = await http.post(
-      Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'service_id': _emailJsServiceId,
-        'template_id': _emailJsTemplateId,
-        'user_id': _emailJsPublicKey,
-        'template_params': {'to_email': email.trim(), 'otp_code': code},
-      }),
-    );
-
-    if (emailResponse.statusCode != 200) {
-      throw 'Failed to send verification email. Please try again.';
-    }
+    // 3. Send OTP email via EmailJS with automatic retry & backoff
+    await _sendEmailWithRetry(email: email, code: code);
   }
 
   /// Verifies the entered OTP for Forgot Password flow strictly via Vercel Admin API.

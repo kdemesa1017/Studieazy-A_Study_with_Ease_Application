@@ -11,6 +11,7 @@ import '../../providers/theme_provider.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/legal_policy_dialog.dart';
 import '../../widgets/admin_2fa_dialog.dart';
+import '../../widgets/sweet_alert_dialog.dart';
 import '../../services/admin_service.dart';
 
 enum ProfileSubView {
@@ -53,7 +54,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // Study Preferences Toggles & State
   String _defaultStudyMode = 'Flashcards';
   int _defaultQuestionCount = 10;
-  bool _shuffleQuestions = true;
+  bool _shuffleQuestions = false;
   bool _shuffleOptions = false;
   bool _dailyReminder = true;
   final String _reminderTime = '08:00 PM';
@@ -121,97 +122,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     VoidCallback? onDismiss,
   }) async {
     if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      useRootNavigator: true,
-      barrierDismissible: false,
-      builder:
-          (ctx) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                color: Theme.of(context).colorScheme.surface,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors:
-                            isSuccess
-                                ? [Colors.green.shade600, Colors.green.shade800]
-                                : [Colors.red.shade600, Colors.red.shade800],
-                      ),
-                    ),
-                    child: Icon(
-                      isSuccess
-                          ? Icons.check_circle_rounded
-                          : Icons.error_outline_rounded,
-                      size: 40,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color:
-                          isSuccess
-                              ? Colors.green.shade700
-                              : Colors.red.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        if (onDismiss != null) onDismiss();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            isSuccess
-                                ? Colors.green.shade600
-                                : Colors.red.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'OK',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-    );
+    if (isSuccess) {
+      await SweetAlert.showSuccess(
+        context,
+        title: title,
+        subtitle: message,
+      );
+    } else {
+      await SweetAlert.showError(
+        context,
+        title: title,
+        subtitle: message,
+      );
+    }
+    if (onDismiss != null) onDismiss();
   }
 
   Future<void> _pickImage() async {

@@ -80,7 +80,8 @@ class _QuizStudyScreenState extends ConsumerState<QuizStudyScreen> {
     if (mounted) {
       setState(() {
         _questions = quizQuestions;
-        _shuffledQuestions = [...quizQuestions]..shuffle();
+        // Keep original creator order by default — do not auto-shuffle
+        _shuffledQuestions = List<QuestionModel>.from(quizQuestions);
         _enumControllers = initialEnumControllers;
         _isLoading = false;
       });

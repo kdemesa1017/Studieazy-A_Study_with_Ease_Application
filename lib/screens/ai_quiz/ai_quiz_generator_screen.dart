@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +24,7 @@ enum _GenerationState { initial, loading, success, error }
 class _AiQuizGeneratorScreenState extends ConsumerState<AiQuizGeneratorScreen> with SingleTickerProviderStateMixin {
   final List<PlatformFile> _selectedFiles = [];
   double _questionCount = 10;
+  late final TextEditingController _countInputCtrl;
   String _difficulty = 'Medium';
   final TextEditingController _instructionController = TextEditingController();
   _GenerationState _state = _GenerationState.initial;
@@ -40,6 +42,7 @@ class _AiQuizGeneratorScreenState extends ConsumerState<AiQuizGeneratorScreen> w
   @override
   void initState() {
     super.initState();
+    _countInputCtrl = TextEditingController(text: _questionCount.toInt().toString());
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -50,6 +53,7 @@ class _AiQuizGeneratorScreenState extends ConsumerState<AiQuizGeneratorScreen> w
   void dispose() {
     _animationController.dispose();
     _instructionController.dispose();
+    _countInputCtrl.dispose();
     super.dispose();
   }
 
@@ -294,20 +298,106 @@ class _AiQuizGeneratorScreenState extends ConsumerState<AiQuizGeneratorScreen> w
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Number of Questions (1-50)',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Number of Questions',
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Type a number or slide (1 - 50)',
+                        style: TextStyle(color: Colors.white60, fontSize: 11),
+                      ),
+                    ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6C63FF).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${_questionCount.toInt()}',
-                      style: const TextStyle(color: Color(0xFF6C63FF), fontWeight: FontWeight.bold),
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Minus Button
+                      IconButton(
+                        onPressed: _questionCount > 1
+                            ? () {
+                                setState(() {
+                                  _questionCount = (_questionCount - 1).clamp(1, 50);
+                                  _countInputCtrl.text = _questionCount.toInt().toString();
+                                });
+                              }
+                            : null,
+                        icon: const Icon(Icons.remove_circle_outline_rounded, size: 22),
+                        color: const Color(0xFF8B5CF6),
+                        disabledColor: Colors.white24,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 6),
+                      // Editable Input Field
+                      Container(
+                        width: 58,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6C63FF).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.5), width: 1.5),
+                        ),
+                        child: Center(
+                          child: TextField(
+                            controller: _countInputCtrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                              border: InputBorder.none,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(2),
+                            ],
+                            onChanged: (val) {
+                              final parsed = int.tryParse(val);
+                              if (parsed != null) {
+                                final clamped = parsed.clamp(1, 50);
+                                setState(() {
+                                  _questionCount = clamped.toDouble();
+                                });
+                              }
+                            },
+                            onSubmitted: (val) {
+                              final parsed = int.tryParse(val) ?? 10;
+                              final clamped = parsed.clamp(1, 50);
+                              setState(() {
+                                _questionCount = clamped.toDouble();
+                                _countInputCtrl.text = clamped.toString();
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Plus Button
+                      IconButton(
+                        onPressed: _questionCount < 50
+                            ? () {
+                                setState(() {
+                                  _questionCount = (_questionCount + 1).clamp(1, 50);
+                                  _countInputCtrl.text = _questionCount.toInt().toString();
+                                });
+                              }
+                            : null,
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 22),
+                        color: const Color(0xFF8B5CF6),
+                        disabledColor: Colors.white24,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -325,7 +415,12 @@ class _AiQuizGeneratorScreenState extends ConsumerState<AiQuizGeneratorScreen> w
                   max: 50,
                   divisions: 49,
                   label: '${_questionCount.toInt()} questions',
-                  onChanged: (val) => setState(() => _questionCount = val),
+                  onChanged: (val) {
+                    setState(() {
+                      _questionCount = val;
+                      _countInputCtrl.text = val.toInt().toString();
+                    });
+                  },
                 ),
               ),
             ],

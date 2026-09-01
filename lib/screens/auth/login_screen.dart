@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/responsive_layout.dart';
+import '../../widgets/sweet_alert_dialog.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -51,105 +52,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     super.dispose();
   }
 
-  void _showResultModal(
+  Future<void> _showResultModal(
     String title,
     String message,
     bool isSuccess, {
     VoidCallback? onDismiss,
-  }) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (context) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors:
-                      isSuccess
-                          ? [Colors.green.shade50, Colors.white]
-                          : [Colors.red.shade50, Colors.white],
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors:
-                            isSuccess
-                                ? [Colors.green, Colors.green.shade600]
-                                : [Colors.red, Colors.red.shade600],
-                      ),
-                    ),
-                    child: Icon(
-                      isSuccess ? Icons.check_rounded : Icons.close_rounded,
-                      size: 40,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A2E),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    message,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                      height: 1.4,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        if (onDismiss != null) onDismiss();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            isSuccess ? Colors.green.shade600 : Colors.red.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'OK',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-    );
+  }) async {
+    if (isSuccess) {
+      await SweetAlert.showSuccess(
+        context,
+        title: title,
+        subtitle: message,
+      );
+    } else {
+      await SweetAlert.showError(
+        context,
+        title: title,
+        subtitle: message,
+      );
+    }
+    if (onDismiss != null) onDismiss();
   }
 
   Future<void> _login() async {
@@ -248,15 +170,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   resendTimer?.cancel();
                 }
               },
-              child: Dialog(
-                backgroundColor: dialogBg,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
+              child: Center(
+                child: Dialog(
+                  backgroundColor: dialogBg,
+                  elevation: 16,
+                  insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    side: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -990,18 +922,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             ),
                           ),
                         ],
-
                       ],
                     ),
                   ),
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
-  }
+  },
+);
+}
 
   @override
   Widget build(BuildContext context) {

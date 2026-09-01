@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../config/app_config.dart';
 import '../models/quiz_model.dart';
@@ -40,6 +41,46 @@ class GeneratedQuestion {
 }
 
 class GeminiService {
+  static String? _cachedApiKey;
+
+  /// Resolves the active Gemini API key dynamically from Firestore (priority 1) or AppConfig (priority 2).
+  static Future<String> getEffectiveApiKey() async {
+    if (_cachedApiKey != null && _cachedApiKey!.isNotEmpty) {
+      return _cachedApiKey!;
+    }
+
+    // 1. Fetch dynamically from Firestore system_config/ai (allows remote updates without rebuild)
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('system_config')
+          .doc('ai')
+          .get();
+      if (doc.exists && doc.data() != null) {
+        final remoteKey = (doc.data()!['gemini_api_key'] ??
+                doc.data()!['apiKey'] ??
+                doc.data()!['geminiApiKey']) as String?;
+        if (remoteKey != null && remoteKey.trim().isNotEmpty) {
+          _cachedApiKey = remoteKey.trim();
+          return _cachedApiKey!;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fallback to AppConfig.geminiApiKey
+    final configKey = AppConfig.geminiApiKey.trim();
+    if (configKey.isNotEmpty &&
+        configKey != 'YOUR_GEMINI_API_KEY' &&
+        configKey != 'GEMINI_API_KEY') {
+      _cachedApiKey = configKey;
+      return configKey;
+    }
+
+    throw Exception(
+      'Missing Gemini API Key!\n\n'
+      'Please add your Gemini API Key in Firestore "system_config/ai" or in lib/config/app_config.dart.',
+    );
+  }
+
   /// Generate a quiz from multiple files simultaneously.
   Future<GeneratedQuizResult> generateQuizFromMultipleFiles({
     required List<({Uint8List bytes, String fileName})> files,
@@ -62,12 +103,7 @@ class GeminiService {
       );
     }
 
-    final apiKey = AppConfig.geminiApiKey.trim();
-    if (apiKey.isEmpty || apiKey == 'YOUR_GEMINI_API_KEY') {
-      throw Exception(
-        'Missing Gemini API Key! Please add your API Key in lib/config/app_config.dart',
-      );
-    }
+    final apiKey = await getEffectiveApiKey();
 
     final prompt = _buildPrompt(questionCount, difficulty, selectedTypes, customInstruction);
     final List<Part> parts = [];
@@ -88,9 +124,12 @@ class GeminiService {
 
     final modelsToTry = [
       AppConfig.geminiModel,
+      'gemini-2.5-flash',
+      'gemini-3.6-flash',
+      'gemini-3.7-flash',
       'gemini-flash-latest',
+      'gemini-2.5-pro',
       'gemini-pro-latest',
-      'gemini-2.0-flash',
     ];
 
     Object? lastError;
@@ -159,12 +198,7 @@ class GeminiService {
     List<String>? selectedTypes,
     String? customInstruction,
   }) async {
-    final apiKey = AppConfig.geminiApiKey.trim();
-    if (apiKey.isEmpty || apiKey == 'YOUR_GEMINI_API_KEY') {
-      throw Exception(
-        'Missing Gemini API Key! Please add your API Key in lib/config/app_config.dart',
-      );
-    }
+    final apiKey = await getEffectiveApiKey();
 
     final ext = fileName.split('.').last.toLowerCase();
     final prompt = _buildPrompt(questionCount, difficulty, selectedTypes, customInstruction);
@@ -191,9 +225,12 @@ class GeminiService {
 
     final modelsToTry = [
       AppConfig.geminiModel,
+      'gemini-2.5-flash',
+      'gemini-3.6-flash',
+      'gemini-3.7-flash',
       'gemini-flash-latest',
+      'gemini-2.5-pro',
       'gemini-pro-latest',
-      'gemini-2.0-flash',
     ];
 
     Object? lastError;
@@ -220,14 +257,6 @@ class GeminiService {
     }
 
     if (response == null || response.text == null || response.text!.isEmpty) {
-      final errStr = lastError.toString();
-      if (errStr.contains('invalid authentication credentials') || apiKey.startsWith('AQ.')) {
-        throw Exception(
-          'Invalid API Key Type! The key starting with "${apiKey.substring(0, apiKey.length > 5 ? 5 : apiKey.length)}" is a Cloud OAuth token.\n\n'
-          'Please get a free Google AI Studio API Key (starts with "AIzaSy...") at:\n'
-          'https://aistudio.google.com/app/apikey',
-        );
-      }
       throw lastError ?? Exception('Gemini returned an empty response. Please try again.');
     }
 

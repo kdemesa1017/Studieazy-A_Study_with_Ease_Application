@@ -150,11 +150,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         // Hero Banner
         _HeroBanner(user: user),
+        const SizedBox(height: 16),
+
+        // Quick Actions Shortcuts
+        const _QuickActions(),
         const SizedBox(height: 20),
 
         // Progress Overview
-        const _SectionHeader(title: 'Your Progress Overview'),
-        const SizedBox(height: 12),
+        const _SectionHeader(title: 'Progress Overview'),
+        const SizedBox(height: 10),
         _ProgressStats(
           streakCount: streakCount,
           totalQuizzes: totalQuizzes,
@@ -162,52 +166,95 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Recent Study Decks + AI Promo
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const _SectionHeader(title: 'Recent Study Decks'),
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => context.go('/my-quizzes'),
-                child: Text(
-                  '→ View All',
-                  style: TextStyle(
-                    color: _kIndigo,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+        // Recent Study Decks & AI Promo Card (Responsive)
+        if (!isDesktop) ...[
+          // Mobile: Full-width AI Promo Banner
+          _AiPromoCard(isOnline: isOnline),
+          const SizedBox(height: 20),
+
+          // Mobile: Recent Study Decks Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const _SectionHeader(title: 'Recent Study Decks'),
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => context.go('/my-quizzes'),
+                  child: const Text(
+                    'View All →',
+                    style: TextStyle(
+                      color: _kIndigo,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: isDesktop ? 6 : 55,
-              child: recentQuizzes.isEmpty
-                  ? _EmptyDecks(onTap: () => context.go('/create-quiz'))
-                  : Column(
-                      children: recentQuizzes
-                          .take(isDesktop ? 4 : 3)
-                          .map((quiz) => Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: _DeckListTile(quiz: quiz),
-                              ))
-                          .toList(),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Mobile: Full-width Deck Tiles (no cramped side-by-side squeezing)
+          recentQuizzes.isEmpty
+              ? _EmptyDecks(onTap: () => context.go('/create-quiz'))
+              : Column(
+                  children: recentQuizzes
+                      .take(4)
+                      .map((quiz) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _DeckListTile(quiz: quiz),
+                          ))
+                      .toList(),
+                ),
+        ] else ...[
+          // Desktop: 2-Column Wide Layout
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const _SectionHeader(title: 'Recent Study Decks'),
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => context.go('/my-quizzes'),
+                  child: const Text(
+                    'View All →',
+                    style: TextStyle(
+                      color: _kIndigo,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
                     ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: isDesktop ? 4 : 45,
-              child: _AiPromoCard(isOnline: isOnline),
-            ),
-          ],
-        ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 6,
+                child: recentQuizzes.isEmpty
+                    ? _EmptyDecks(onTap: () => context.go('/create-quiz'))
+                    : Column(
+                        children: recentQuizzes
+                            .take(4)
+                            .map((quiz) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: _DeckListTile(quiz: quiz),
+                                ))
+                            .toList(),
+                      ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 4,
+                child: _AiPromoCard(isOnline: isOnline),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 24),
 
         // Continue Learning Journey
@@ -304,108 +351,130 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Hero Banner
+// Hero Banner  (full-width, time-aware, glowing gradient)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _HeroBanner extends StatelessWidget {
   final dynamic user;
   const _HeroBanner({required this.user});
 
+  String get _greeting {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good Morning ☀️';
+    if (h < 17) return 'Good Afternoon 📚';
+    return 'Good Evening 🌙';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final showIllustration = width >= 480;
+    final firstName = (user?.name ?? 'Student').split(' ').first;
 
     return Container(
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 150),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1E1B4B), Color(0xFF312E81)],
+          colors: [Color(0xFF0F0C29), Color(0xFF302B63), Color(0xFF24243E)],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: _kIndigo.withValues(alpha: 0.25),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF6366F1).withValues(alpha: 0.35),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Stack(
         clipBehavior: Clip.antiAlias,
         children: [
-          // Sparkle decorations
-          Positioned(right: showIllustration ? 210 : 16, top: 12,
-            child: Icon(Icons.auto_awesome, color: Colors.white.withValues(alpha: 0.15), size: 16)),
-          Positioned(right: showIllustration ? 260 : 56, top: 38,
-            child: Icon(Icons.star_rounded, color: Colors.white.withValues(alpha: 0.10), size: 10)),
-          Positioned(right: showIllustration ? 190 : 10, bottom: 18,
-            child: Icon(Icons.auto_awesome, color: Colors.white.withValues(alpha: 0.10), size: 12)),
-
-          // Right-side decorative illustration
-          if (showIllustration)
-            Positioned(
-              right: 0, top: 0, bottom: 0,
-              child: SizedBox(
-                width: 195,
-                child: _HeroDecoration(),
+          // Glowing orb — top right
+          Positioned(
+            right: -24, top: -24,
+            child: Container(
+              width: 170, height: 170,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF6366F1).withValues(alpha: 0.14),
               ),
             ),
+          ),
+          // Glowing orb — bottom left
+          Positioned(
+            left: -20, bottom: -20,
+            child: Container(
+              width: 110, height: 110,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+              ),
+            ),
+          ),
+          // Sparkles
+          Positioned(right: 55, top: 20,
+            child: Icon(Icons.auto_awesome, color: Colors.white.withValues(alpha: 0.22), size: 16)),
+          Positioned(right: 20, top: 48,
+            child: Icon(Icons.star_rounded, color: Colors.white.withValues(alpha: 0.14), size: 10)),
+          Positioned(right: 90, bottom: 22,
+            child: Icon(Icons.auto_awesome, color: Colors.white.withValues(alpha: 0.14), size: 12)),
 
-          // Text content
+          // Content
           Padding(
-            padding: EdgeInsets.fromLTRB(22, 26, showIllustration ? 210 : 22, 26),
+            padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'Welcome back,',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.70),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                // Greeting pill
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+                  ),
+                  child: Text(
+                    _greeting,
+                    style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 12),
                 Text(
-                  '${(user?.name ?? 'Student').toUpperCase()} 👋',
+                  firstName,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 28,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 0.2,
-                    height: 1.2,
+                    letterSpacing: -0.5,
+                    height: 1.1,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
-                  'What subject would you like to master today?',
+                  'Ready to level up your knowledge today?',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.60),
-                    fontSize: 12.5,
-                    height: 1.3,
+                    color: Colors.white.withValues(alpha: 0.62),
+                    fontSize: 13,
+                    height: 1.35,
                   ),
                 ),
-                const SizedBox(height: 18),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 8,
+                const SizedBox(height: 20),
+                Row(
                   children: [
-                    _HeroBtn(
-                      label: 'Generate with AI',
-                      icon: Icons.auto_awesome_rounded,
-                      onTap: () => context.go('/ai-generator'),
-                      filled: true,
+                    Expanded(
+                      child: _HeroActionBtn(
+                        label: '✨  Generate with AI',
+                        filled: true,
+                        onTap: () => context.go('/ai-generator'),
+                      ),
                     ),
-                    _HeroBtn(
-                      label: 'Create New Deck',
-                      icon: Icons.add_rounded,
-                      onTap: () => context.go('/create-quiz'),
-                      filled: false,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _HeroActionBtn(
+                        label: '+  Create Deck',
+                        filled: false,
+                        onTap: () => context.go('/create-quiz'),
+                      ),
                     ),
                   ],
                 ),
@@ -418,90 +487,11 @@ class _HeroBanner extends StatelessWidget {
   }
 }
 
-class _HeroDecoration extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // Glow
-        Positioned(
-          right: 20, top: 15,
-          child: Container(
-            width: 140, height: 140,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _kPurple.withValues(alpha: 0.18),
-            ),
-          ),
-        ),
-        // Person avatar
-        Positioned(
-          right: 52, top: 22,
-          child: Container(
-            width: 74, height: 74,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [_kIndigo, _kPurple]),
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: _kIndigo.withValues(alpha: 0.45), blurRadius: 18)],
-            ),
-            child: const Icon(Icons.person_rounded, color: Colors.white, size: 38),
-          ),
-        ),
-        // Floating card: Study Progress
-        Positioned(
-          right: 8, top: 14,
-          child: _MiniFloatCard(icon: Icons.trending_up_rounded, label: 'Study Progress', color: _kIndigo),
-        ),
-        // Floating card: Knowledge
-        Positioned(
-          right: 90, bottom: 22,
-          child: _MiniFloatCard(icon: Icons.pie_chart_rounded, label: 'Knowledge', color: _kOrange),
-        ),
-        // Floating card: Score
-        Positioned(
-          right: 6, bottom: 32,
-          child: _MiniFloatCard(icon: Icons.star_rounded, label: 'Score', color: _kGreen),
-        ),
-      ],
-    );
-  }
-}
-
-class _MiniFloatCard extends StatelessWidget {
-  final IconData icon;
+class _HeroActionBtn extends StatelessWidget {
   final String label;
-  final Color color;
-  const _MiniFloatCard({required this.icon, required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.18), blurRadius: 8)],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 12),
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroBtn extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
   final bool filled;
-  const _HeroBtn({required this.label, required this.icon, required this.onTap, required this.filled});
+  final VoidCallback onTap;
+  const _HeroActionBtn({required this.label, required this.filled, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -509,31 +499,117 @@ class _HeroBtn extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        mouseCursor: SystemMouseCursors.click,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(11),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          padding: const EdgeInsets.symmetric(vertical: 11),
           decoration: BoxDecoration(
-            color: filled ? _kPurple : Colors.white.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-            border: filled ? null : Border.all(color: Colors.white.withValues(alpha: 0.28)),
+            gradient: filled
+                ? const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)])
+                : null,
+            color: filled ? null : Colors.white.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(11),
+            border: filled
+                ? null
+                : Border.all(color: Colors.white.withValues(alpha: 0.28)),
             boxShadow: filled
-                ? [BoxShadow(color: _kPurple.withValues(alpha: 0.40), blurRadius: 10, offset: const Offset(0, 4))]
+                ? [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.45), blurRadius: 12, offset: const Offset(0, 4))]
                 : null,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: Colors.white, size: 14),
-              const SizedBox(width: 6),
-              Text(label, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700)),
-            ],
+          child: Center(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 0.1,
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Quick Actions (horizontal scrollable chip shortcuts)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final actions = [
+      (icon: Icons.auto_awesome_rounded, label: 'AI Generate', color: _kPurple, route: '/ai-generator'),
+      (icon: Icons.folder_rounded,       label: 'My Quizzes',  color: _kBlue,   route: '/my-quizzes'),
+      (icon: Icons.school_rounded,       label: 'Study Mode',  color: _kGreen,  route: '/study'),
+      (icon: Icons.add_rounded,          label: 'Create Deck', color: _kIndigo, route: '/create-quiz'),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: actions.map((a) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => context.go(a.route),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? _kCard : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? _kBorder : Colors.grey.shade200,
+                    ),
+                    boxShadow: isDark
+                        ? null
+                        : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 28, height: 28,
+                        decoration: BoxDecoration(
+                          color: a.color.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(a.icon, color: a.color, size: 15),
+                      ),
+                      const SizedBox(width: 9),
+                      Text(
+                        a.label,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : const Color(0xFF1E293B),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Progress Stats (3 cards)
+// ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Progress Stats (3 cards)
@@ -566,31 +642,27 @@ class _ProgressStats extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 32, height: 32,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFFFF6B35), _kOrange]),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.local_fire_department, color: Colors.white, size: 17),
-                    ),
-                  ],
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFFFF6B35), _kOrange]),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.local_fire_department_rounded, color: Colors.white, size: 18),
                 ),
-                const SizedBox(height: 7),
+                const SizedBox(height: 8),
                 Text(
-                  'Daily Streak',
-                  style: TextStyle(color: Colors.orange.shade400, fontSize: 10.5, fontWeight: FontWeight.w600),
+                  'Streak',
+                  style: TextStyle(color: Colors.orange.shade400, fontSize: 11, fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
                       '$streakCount',
-                      style: const TextStyle(color: Color(0xFFFF8C00), fontSize: 26, fontWeight: FontWeight.bold, height: 1),
+                      style: const TextStyle(color: Color(0xFFFF8C00), fontSize: 22, fontWeight: FontWeight.bold, height: 1),
                     ),
                     const SizedBox(width: 3),
                     Text(
@@ -630,24 +702,23 @@ class _ProgressStats extends StatelessWidget {
                     color: _kBlue.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.folder_rounded, color: _kBlue, size: 17),
+                  child: const Icon(Icons.folder_rounded, color: _kBlue, size: 18),
                 ),
-                const SizedBox(height: 7),
-                Text('Quizzes Created',
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 10.5, fontWeight: FontWeight.w600),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 3),
+                const SizedBox(height: 8),
+                Text('Quizzes',
+                    style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF475569), fontSize: 11, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
                 Text(
                   '$totalQuizzes',
                   style: TextStyle(
                     color: isDark ? Colors.white : const Color(0xFF1E293B),
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                     height: 1,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text('Total', style: TextStyle(color: Colors.grey.shade500, fontSize: 10)),
+                const SizedBox(height: 6),
+                Text('Created', style: TextStyle(color: Colors.grey.shade500, fontSize: 10)),
               ],
             ),
           ),
@@ -666,24 +737,23 @@ class _ProgressStats extends StatelessWidget {
                     color: _kGreen.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.check_circle_rounded, color: _kGreen, size: 17),
+                  child: const Icon(Icons.check_circle_rounded, color: _kGreen, size: 18),
                 ),
-                const SizedBox(height: 7),
-                Text('Questions Studied',
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 10.5, fontWeight: FontWeight.w600),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 3),
+                const SizedBox(height: 8),
+                Text('Questions',
+                    style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF475569), fontSize: 11, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
                 Text(
                   '$totalQuestions',
                   style: TextStyle(
                     color: isDark ? Colors.white : const Color(0xFF1E293B),
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                     height: 1,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text('Total', style: TextStyle(color: Colors.grey.shade500, fontSize: 10)),
+                const SizedBox(height: 6),
+                Text('Studied', style: TextStyle(color: Colors.grey.shade500, fontSize: 10)),
               ],
             ),
           ),
@@ -701,7 +771,7 @@ class _StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
         color: isDark ? _kCard : Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -716,7 +786,7 @@ class _StatTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Deck List Tile
+// Deck List Tile (Spacious Full-Width Design)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _DeckListTile extends StatelessWidget {
@@ -731,29 +801,32 @@ class _DeckListTile extends StatelessWidget {
       child: InkWell(
         onTap: () => context.push('/quiz/${quiz.id}'),
         mouseCursor: SystemMouseCursors.click,
-        borderRadius: BorderRadius.circular(13),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           decoration: BoxDecoration(
             color: isDark ? _kCard : Colors.white,
-            borderRadius: BorderRadius.circular(13),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: isDark ? _kBorder : Colors.grey.shade200),
+            boxShadow: isDark
+                ? null
+                : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2))],
           ),
           child: Row(
             children: [
               Container(
-                width: 42, height: 42,
+                width: 44, height: 44,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [_kPurple, _kIndigo],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(11),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 20),
+                child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 22),
               ),
-              const SizedBox(width: 11),
+              const SizedBox(width: 13),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -761,60 +834,67 @@ class _DeckListTile extends StatelessWidget {
                     Text(
                       quiz.title,
                       style: TextStyle(
-                        color: isDark ? Colors.white : const Color(0xFF1E293B),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12.5,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        letterSpacing: -0.2,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if ((quiz.category ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(quiz.category!,
-                          style: const TextStyle(color: _kIndigo, fontSize: 10.5, fontWeight: FontWeight.w600)),
-                    ],
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.help_outline_rounded, size: 10, color: Colors.grey.shade500),
-                        const SizedBox(width: 2),
+                        if ((quiz.category ?? '').isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _kIndigo.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              quiz.category!,
+                              style: const TextStyle(color: _kIndigo, fontSize: 10, fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Icon(Icons.help_outline_rounded, size: 12, color: Colors.grey.shade500),
+                        const SizedBox(width: 3),
                         Text('${quiz.questionIds.length} Questions',
-                            style: TextStyle(color: Colors.grey.shade500, fontSize: 9.5)),
-                        const SizedBox(width: 8),
-                        Icon(Icons.play_circle_outline_rounded, size: 10, color: Colors.grey.shade500),
-                        const SizedBox(width: 2),
-                        Text('Studied ${quiz.studyCount ?? 0} times',
-                            style: TextStyle(color: Colors.grey.shade500, fontSize: 9.5)),
+                            style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
                       ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               SizedBox(
-                width: 36, height: 36,
+                width: 38, height: 38,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     CircularProgressIndicator(
                       value: (quiz.averageScore ?? 0) / 100,
-                      strokeWidth: 3,
-                      backgroundColor: Colors.grey.shade700,
+                      strokeWidth: 3.5,
+                      backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
                       valueColor: const AlwaysStoppedAnimation<Color>(_kGreen),
                     ),
                     Text(
                       '${(quiz.averageScore ?? 0).toInt()}%',
                       style: TextStyle(
                         color: isDark ? Colors.white : const Color(0xFF1E293B),
-                        fontSize: 8.5,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 6),
-              Icon(Icons.chevron_right_rounded, color: Colors.grey.shade500, size: 19),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right_rounded, color: Colors.grey.shade500, size: 20),
             ],
           ),
         ),
@@ -824,7 +904,7 @@ class _DeckListTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AI Promo Card
+// AI Promo Card (Modern Eye-Catching Banner)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _AiPromoCard extends StatelessWidget {
@@ -838,20 +918,28 @@ class _AiPromoCard extends StatelessWidget {
       child: InkWell(
         onTap: isOnline ? () => context.go('/ai-generator') : null,
         mouseCursor: isOnline ? SystemMouseCursors.click : SystemMouseCursors.basic,
-        borderRadius: BorderRadius.circular(13),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
+            gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF1E293B),
-                const Color(0xFF6D28D9).withValues(alpha: 0.45),
+                Color(0xFF1E1B4B),
+                Color(0xFF4338CA),
+                Color(0xFF6D28D9),
               ],
             ),
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: _kPurple.withValues(alpha: 0.30)),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4338CA).withValues(alpha: 0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -859,43 +947,68 @@ class _AiPromoCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    width: 34, height: 34,
+                    width: 38, height: 38,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [_kPurple, _kIndigo]),
-                      borderRadius: BorderRadius.circular(9),
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
                     ),
-                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
+                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
                   ),
-                  const SizedBox(width: 9),
+                  const SizedBox(width: 12),
                   const Expanded(
-                    child: Text(
-                      'AI Quiz Generator',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI Quiz Generator',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: -0.2),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Powered by Google Gemini AI',
+                          style: TextStyle(color: Color(0xFFA5B4FC), fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Paste notes or upload PDFs to generate smart flashcards instantly with AI.',
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.60), fontSize: 11.5, height: 1.4),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Text(
-                    'Try AI Generator',
-                    style: TextStyle(
-                      color: isOnline ? _kPurple : Colors.grey,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+              Text(
+                'Paste notes or upload PDFs & Word documents to generate complete study decks in seconds.',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: 12.5,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 6),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Generate Flashcards',
+                      style: TextStyle(
+                        color: isOnline ? const Color(0xFF4338CA) : Colors.grey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_rounded,
-                      color: isOnline ? _kPurple : Colors.grey, size: 13),
-                ],
+                    const SizedBox(width: 6),
+                    Icon(Icons.arrow_forward_rounded,
+                        color: isOnline ? const Color(0xFF4338CA) : Colors.grey, size: 14),
+                  ],
+                ),
               ),
             ],
           ),
