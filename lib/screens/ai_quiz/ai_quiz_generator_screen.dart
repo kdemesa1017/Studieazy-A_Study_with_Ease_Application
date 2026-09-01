@@ -295,113 +295,136 @@ class _AiQuizGeneratorScreenState extends ConsumerState<AiQuizGeneratorScreen> w
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 360;
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        'Number of Questions',
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Type a number or slide (1 - 50)',
-                        style: TextStyle(color: Colors.white60, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Minus Button
-                      IconButton(
-                        onPressed: _questionCount > 1
-                            ? () {
-                                setState(() {
-                                  _questionCount = (_questionCount - 1).clamp(1, 50);
-                                  _countInputCtrl.text = _questionCount.toInt().toString();
-                                });
-                              }
-                            : null,
-                        icon: const Icon(Icons.remove_circle_outline_rounded, size: 22),
-                        color: const Color(0xFF8B5CF6),
-                        disabledColor: Colors.white24,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 6),
-                      // Editable Input Field
-                      Container(
-                        width: 58,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6C63FF).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.5), width: 1.5),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Number of Questions',
+                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isNarrow ? 'Slide or type (1-50)' : 'Type a number or slide (1 - 50)',
+                              style: const TextStyle(color: Colors.white60, fontSize: 11),
+                            ),
+                          ],
                         ),
-                        child: Center(
-                          child: TextField(
-                            controller: _countInputCtrl,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                      ),
+                      const SizedBox(width: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Minus Button
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: _questionCount > 1
+                                  ? () {
+                                      setState(() {
+                                        _questionCount = (_questionCount - 1).clamp(1, 50);
+                                        _countInputCtrl.text = _questionCount.toInt().toString();
+                                      });
+                                    }
+                                  : null,
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.remove_circle_outline_rounded,
+                                  size: 24,
+                                  color: _questionCount > 1 ? const Color(0xFF8B5CF6) : Colors.white24,
+                                ),
+                              ),
                             ),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                              border: InputBorder.none,
-                            ),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(2),
-                            ],
-                            onChanged: (val) {
-                              final parsed = int.tryParse(val);
-                              if (parsed != null) {
-                                final clamped = parsed.clamp(1, 50);
-                                setState(() {
-                                  _questionCount = clamped.toDouble();
-                                });
-                              }
-                            },
-                            onSubmitted: (val) {
-                              final parsed = int.tryParse(val) ?? 10;
-                              final clamped = parsed.clamp(1, 50);
-                              setState(() {
-                                _questionCount = clamped.toDouble();
-                                _countInputCtrl.text = clamped.toString();
-                              });
-                            },
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Plus Button
-                      IconButton(
-                        onPressed: _questionCount < 50
-                            ? () {
-                                setState(() {
-                                  _questionCount = (_questionCount + 1).clamp(1, 50);
-                                  _countInputCtrl.text = _questionCount.toInt().toString();
-                                });
-                              }
-                            : null,
-                        icon: const Icon(Icons.add_circle_outline_rounded, size: 22),
-                        color: const Color(0xFF8B5CF6),
-                        disabledColor: Colors.white24,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                          const SizedBox(width: 4),
+                          // Editable Input Field
+                          Container(
+                            width: 52,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6C63FF).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.6), width: 1.5),
+                            ),
+                            child: Center(
+                              child: TextField(
+                                controller: _countInputCtrl,
+                                keyboardType: TextInputType.number,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  border: InputBorder.none,
+                                ),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(2),
+                                ],
+                                onChanged: (val) {
+                                  final parsed = int.tryParse(val);
+                                  if (parsed != null) {
+                                    final clamped = parsed.clamp(1, 50);
+                                    setState(() {
+                                      _questionCount = clamped.toDouble();
+                                    });
+                                  }
+                                },
+                                onSubmitted: (val) {
+                                  final parsed = int.tryParse(val) ?? 10;
+                                  final clamped = parsed.clamp(1, 50);
+                                  setState(() {
+                                    _questionCount = clamped.toDouble();
+                                    _countInputCtrl.text = clamped.toString();
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          // Plus Button
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: _questionCount < 50
+                                  ? () {
+                                      setState(() {
+                                        _questionCount = (_questionCount + 1).clamp(1, 50);
+                                        _countInputCtrl.text = _questionCount.toInt().toString();
+                                      });
+                                    }
+                                  : null,
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.add_circle_outline_rounded,
+                                  size: 24,
+                                  color: _questionCount < 50 ? const Color(0xFF8B5CF6) : Colors.white24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
+                  );
+                },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               SliderTheme(
                 data: SliderThemeData(
                   activeTrackColor: const Color(0xFF6C63FF),

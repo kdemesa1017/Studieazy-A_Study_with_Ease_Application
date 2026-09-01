@@ -223,6 +223,7 @@ class QuizNotifier extends StateNotifier<AsyncValue<List<QuizModel>>> {
     bool isFlashcard = false,
     String? flashcardBack,
     String questionType = 'mcq',
+    String? imageUrl,
   }) async {
     final question = QuestionModel(
       id: _uuid.v4(),
@@ -233,6 +234,7 @@ class QuizNotifier extends StateNotifier<AsyncValue<List<QuizModel>>> {
       isFlashcard: isFlashcard,
       flashcardBack: flashcardBack,
       questionType: questionType,
+      imageUrl: imageUrl,
       createdAt: DateTime.now(),
     );
 
@@ -286,6 +288,7 @@ class QuizNotifier extends StateNotifier<AsyncValue<List<QuizModel>>> {
     bool? isFlashcard,
     String? flashcardBack,
     String? questionType,
+    String? imageUrl,
   }) async {
     QuestionModel? existing;
     final quizzes = await _localStore.loadQuizzes(_userId);
@@ -308,6 +311,7 @@ class QuizNotifier extends StateNotifier<AsyncValue<List<QuizModel>>> {
       isFlashcard: isFlashcard ?? existing.isFlashcard,
       flashcardBack: flashcardBack ?? existing.flashcardBack,
       questionType: questionType ?? existing.questionType,
+      imageUrl: imageUrl ?? existing.imageUrl,
     );
 
     await _localStore.upsertQuestion(updated);
@@ -322,6 +326,7 @@ class QuizNotifier extends StateNotifier<AsyncValue<List<QuizModel>>> {
         if (isFlashcard != null) 'isFlashcard': isFlashcard,
         if (flashcardBack != null) 'flashcardBack': flashcardBack,
         if (questionType != null) 'questionType': questionType,
+        if (imageUrl != null) 'imageUrl': imageUrl,
       },
     );
     await _emitLocalQuizzes();

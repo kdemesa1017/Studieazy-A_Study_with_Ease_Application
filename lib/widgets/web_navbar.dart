@@ -274,7 +274,7 @@ class WebNavbar extends ConsumerWidget implements PreferredSizeWidget {
                       if (value == 'profile') {
                         context.go('/profile');
                       } else if (value == 'logout') {
-                        await ref.read(authServiceProvider).signOut();
+                        await ref.read(currentUserProvider.notifier).signOut();
                         if (context.mounted) context.go('/login');
                       }
                     },

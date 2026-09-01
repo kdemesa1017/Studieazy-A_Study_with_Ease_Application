@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/quiz_provider.dart';
 import '../../providers/connectivity_provider.dart';
+import '../../widgets/app_question_image.dart';
 
 // ── Question type enum ────────────────────────────────────────────────────────
 
@@ -98,6 +100,7 @@ class QuestionFormData {
   int correctAnswerIndex = 0;
   // Per-question type used when the quiz is in Combine mode
   QuizMode selectedType = QuizMode.mcq;
+  String? imageUrl;
 
   void dispose() {
     questionController.dispose();
@@ -297,6 +300,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
               isFlashcard: isFlashcard,
               flashcardBack: flashcardBack,
               questionType: questionType,
+              imageUrl: q.imageUrl,
             );
       }
 
@@ -930,10 +934,268 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
                     isDark,
                   ),
                 ),
+                const SizedBox(height: 10),
+                _buildQuestionImageSection(q, isDark),
                 const SizedBox(height: 14),
                 _buildAnswerSection(index, q, effectiveType, isDark),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Optional image attachment for diagram / visual questions
+  Widget _buildQuestionImageSection(QuestionFormData q, bool isDark) {
+    if (q.imageUrl != null && q.imageUrl!.trim().isNotEmpty) {
+      final isBase64 = q.imageUrl!.trim().startsWith('data:image') ||
+          (!q.imageUrl!.trim().startsWith('http://') && !q.imageUrl!.trim().startsWith('https://'));
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade300),
+        ),
+        child: Row(
+          children: [
+            AppQuestionImage(
+              imageUrl: q.imageUrl,
+              width: 60,
+              height: 60,
+              fit: BoxFit.cover,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.image_rounded, size: 14, color: Color(0xFF6366F1)),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          isBase64 ? 'Uploaded Image (Offline & Synced)' : 'Web Image Link',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF1E293B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isBase64 ? 'Saved directly with question • Syncs across all devices' : q.imageUrl!.trim(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? Colors.white60 : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded, size: 18, color: Colors.redAccent),
+              tooltip: 'Remove image',
+              onPressed: () => setState(() => q.imageUrl = null),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () => _showImageSourcePicker(q, isDark),
+        icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
+        label: const Text('Add Image / Diagram (Upload or URL)', style: TextStyle(fontSize: 12)),
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFF6366F1),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
+    );
+  }
+
+  void _showImageSourcePicker(QuestionFormData q, bool isDark) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Attach Question Image',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Uploaded images are stored offline and automatically sync across all your devices.',
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.grey.shade600),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFF6366F1), size: 22),
+                ),
+                title: const Text('Upload from Gallery / Files', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Choose from your device or computer', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImageFromDevice(q, ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF10B981), size: 22),
+                ),
+                title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Capture diagrams directly from notes or books', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImageFromDevice(q, ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.link_rounded, color: Color(0xFF3B82F6), size: 22),
+                ),
+                title: const Text('Paste Image URL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text('Use a public web image link', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _promptImageUrl(q, isDark);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImageFromDevice(QuestionFormData q, ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 70,
+      );
+      if (picked == null) return;
+
+      final bytes = await picked.readAsBytes();
+      final base64String = AppQuestionImage.bytesToBase64(bytes);
+
+      if (mounted) {
+        setState(() {
+          q.imageUrl = base64String;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load image: $e')),
+        );
+      }
+    }
+  }
+
+  void _promptImageUrl(QuestionFormData q, bool isDark) {
+    final urlCtrl = TextEditingController(text: q.imageUrl ?? '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.image_outlined, color: Color(0xFF6366F1)),
+            const SizedBox(width: 8),
+            Text(
+              'Add Question Image URL',
+              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF1E293B), fontSize: 16),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Paste a public image link (e.g. from Imgur, Cloudinary, or web):',
+              style: TextStyle(color: isDark ? Colors.white70 : Colors.grey.shade600, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: urlCtrl,
+              autofocus: true,
+              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF1E293B), fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'https://example.com/diagram.png',
+                hintStyle: TextStyle(color: isDark ? Colors.white30 : Colors.grey.shade400, fontSize: 13),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final text = urlCtrl.text.trim();
+              setState(() {
+                q.imageUrl = text.isEmpty ? null : text;
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save Image'),
           ),
         ],
       ),
@@ -978,44 +1240,10 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen>
   Widget _buildAnswerSection(int index, QuestionFormData q, QuizMode mode, bool isDark) {
     switch (mode) {
       case QuizMode.identification:
-        final uploadBg = isDark ? const Color(0xFF161A30) : Colors.grey.shade50;
-        final uploadBorder = isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey.shade200;
-        final uploadIcon = isDark ? Colors.white38 : Colors.grey.shade400;
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _fieldLabel('Add Image (Optional)', isDark: isDark),
-            const SizedBox(height: 6),
-            GestureDetector(
-              onTap: () => _showSnack('Image upload — Coming Soon!'),
-              child: Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: uploadBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: uploadBorder),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.add_photo_alternate_outlined,
-                      size: 32,
-                      color: uploadIcon,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Tap to upload image',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: uploadIcon,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _buildQuestionImageSection(q, isDark),
             const SizedBox(height: 14),
             _fieldLabel('Answer', isDark: isDark),
             const SizedBox(height: 6),

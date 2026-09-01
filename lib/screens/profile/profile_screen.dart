@@ -10,6 +10,7 @@ import '../../providers/quiz_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/legal_policy_dialog.dart';
+import '../../widgets/user_guide_dialog.dart';
 import '../../widgets/admin_2fa_dialog.dart';
 import '../../widgets/sweet_alert_dialog.dart';
 import '../../services/admin_service.dart';
@@ -253,26 +254,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _logout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Logout'),
-            content: const Text('Are you sure you want to logout?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Logout'),
-              ),
-            ],
-          ),
+    final confirmed = await SweetAlert.showConfirm(
+      context,
+      title: 'Log Out',
+      subtitle: 'Are you sure you want to log out of your Studieazy account?',
+      confirmButtonText: 'Log Out',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: Colors.redAccent,
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       await ref.read(currentUserProvider.notifier).signOut();
       if (mounted) {
         context.go('/login');
@@ -548,15 +539,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               icon: Icons.admin_panel_settings_rounded,
               title: 'Admin Control Center',
               subtitle: 'System health, errors, support tickets & backups',
-              onTap: () {
-                Admin2faDialog.show(
+              onTap: () async {
+                final proceed = await SweetAlert.showConfirm(
                   context,
-                  adminUser: user,
-                  onVerified: () => context.go('/admin'),
+                  title: 'Admin Verification',
+                  subtitle: 'This will send a 6-digit security code to your email (${user.email}). Do you want to proceed?',
+                  confirmButtonText: 'Send Code',
+                  cancelButtonText: 'Cancel',
+                  confirmButtonColor: const Color(0xFF6C63FF),
                 );
+                if (proceed == true && mounted) {
+                  Admin2faDialog.show(
+                    context,
+                    adminUser: user,
+                    onVerified: () => context.go('/admin'),
+                  );
+                }
               },
               isDark: isDark,
             ),
+          _menuTile(
+            icon: Icons.menu_book_rounded,
+            title: 'User Guide & FAQs',
+            subtitle: 'How to use AI generator, study modes & shortcuts',
+            onTap: () => UserGuideDialog.show(context, initialTabIndex: 0),
+            isDark: isDark,
+          ),
           _menuTile(
             icon: Icons.policy_outlined,
             title: 'Terms & Privacy Policy',
@@ -567,7 +575,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _menuTile(
             icon: Icons.help_outline_rounded,
             title: 'Help & Support',
-            subtitle: 'Get help and contact support',
+            subtitle: 'Get help, FAQs and contact support',
             onTap: () => setState(() => _currentView = ProfileSubView.helpSupport),
             isDark: isDark,
           ),
@@ -1056,7 +1064,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             child: Column(
               children: [
-                _settingRow('Frequently Asked Questions', 'Find answers to common questions', Icons.help_outline_rounded, isDark, onTap: () => _comingSoon('FAQ')),
+                _settingRow('Frequently Asked Questions', 'Find answers to common questions', Icons.help_outline_rounded, isDark, onTap: () => UserGuideDialog.show(context, initialTabIndex: 1)),
                 _divider(isDark),
                 _settingRow('Contact Support', "We're here to help you", Icons.support_agent_rounded, isDark, onTap: () => _showSupportTicketDialog(context, 'Account / Support', user, isDark)),
                 _divider(isDark),
@@ -1076,7 +1084,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             child: Column(
               children: [
-                _settingRow('User Guide', 'Learn how to use the app', Icons.article_outlined, isDark, onTap: () => _comingSoon('User Guide')),
+                _settingRow('User Guide', 'Learn how to use the app', Icons.article_outlined, isDark, onTap: () => UserGuideDialog.show(context, initialTabIndex: 0)),
                 _divider(isDark),
                 _settingRow('Privacy Policy', 'Read our privacy policy', Icons.privacy_tip_outlined, isDark, onTap: () => LegalPolicyDialog.show(context)),
                 _divider(isDark),
@@ -1253,15 +1261,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   );
                                   if (ctx.mounted) {
                                     Navigator.of(ctx).pop();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Support ticket sent! Admin will review it soon.')),
+                                  }
+                                  if (context.mounted) {
+                                    SweetAlert.showSuccess(
+                                      context,
+                                      title: 'Report Submitted!',
+                                      subtitle: 'Your support ticket has been received. Our team will review it shortly.',
+                                      confirmButtonText: 'OK',
                                     );
                                   }
                                 } catch (e) {
                                   if (ctx.mounted) {
                                     setSheetState(() => isSubmitting = false);
-                                    ScaffoldMessenger.of(ctx).showSnackBar(
-                                      SnackBar(content: Text('Failed to submit: $e')),
+                                    SweetAlert.showError(
+                                      ctx,
+                                      title: 'Submission Failed',
+                                      subtitle: 'Could not send report: $e',
                                     );
                                   }
                                 }
@@ -1373,13 +1388,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           child: Icon(icon, color: Colors.white, size: 22),
         ),
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: isDark ? Colors.white : const Color(0xFF111827),
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: isDark ? Colors.white : const Color(0xFF111827),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: 8),
@@ -1390,7 +1410,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: const Text(
-                'ADMIN ONLY',
+                'ADMIN',
                 style: TextStyle(
                   color: Color(0xFF6366F1),
                   fontSize: 9,
@@ -1418,7 +1438,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }) {
     final cardBg = isDark ? const Color(0xFF1A1F38) : Colors.white;
     final titleColor = isDark ? Colors.white : const Color(0xFF111827);
-    final subtitleColor = isDark ? Colors.white38 : Colors.grey.shade500;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1429,18 +1448,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
       child: ListTile(
         onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         leading: Container(
-          width: 38,
-          height: 38,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
-            color: const Color(0xFF5C4EE8).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
+            color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF0EFFF),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: const Color(0xFF7C6FF7), size: 20),
+          child: Icon(icon, color: const Color(0xFF5C4EE8), size: 22),
         ),
         title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: titleColor)),
-        subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: subtitleColor)),
+        subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey.shade500)),
         trailing: Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white38 : Colors.grey.shade400),
       ),
     );
@@ -1449,17 +1468,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _settingRow(String title, String value, IconData icon, bool isDark, {required VoidCallback onTap}) {
     return ListTile(
       onTap: onTap,
-      leading: Icon(icon, size: 20, color: isDark ? Colors.white70 : Colors.grey.shade600),
-      title: Text(title, style: TextStyle(fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (value.isNotEmpty)
-            Text(value, style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade500)),
-          const SizedBox(width: 4),
-          Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white38 : Colors.grey.shade400, size: 20),
-        ],
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF0EFFF),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 20, color: isDark ? Colors.white70 : const Color(0xFF5C4EE8)),
       ),
+      title: Text(
+        title,
+        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87),
+      ),
+      subtitle: value.isNotEmpty
+          ? Text(
+              value,
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600),
+            )
+          : null,
+      trailing: Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white38 : Colors.grey.shade400, size: 20),
     );
   }
 

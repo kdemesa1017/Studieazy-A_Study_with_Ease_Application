@@ -6,6 +6,7 @@ import '../../providers/quiz_provider.dart';
 import '../../models/quiz_model.dart';
 import '../../models/question_model.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/app_question_image.dart';
 
 class QuizDetailScreen extends ConsumerStatefulWidget {
   final String quizId;
@@ -1035,14 +1036,43 @@ class _QuizDetailScreenState extends ConsumerState<QuizDetailScreen> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          subtitle: Text(
-            question.isEnumeration
-                ? '${question.options.length} items to enumerate'
-                : question.isIdentification
-                    ? 'Identification'
-                    : question.isFlashcard
-                        ? 'Flashcard'
-                        : '${question.options.length} options',
+          subtitle: Row(
+            children: [
+              Text(
+                question.isEnumeration
+                    ? '${question.options.length} items to enumerate'
+                    : question.isIdentification
+                        ? 'Identification'
+                        : question.isFlashcard
+                            ? 'Flashcard'
+                            : '${question.options.length} options',
+              ),
+              if (question.imageUrl != null && question.imageUrl!.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.image_outlined, size: 12, color: Color(0xFF6366F1)),
+                      SizedBox(width: 3),
+                      Text(
+                        'Image',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF6366F1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
           leading: Container(
             width: 36,
@@ -1075,15 +1105,27 @@ class _QuizDetailScreenState extends ConsumerState<QuizDetailScreen> {
                           : Colors.blue,
             ),
           ),
-          trailing: canEdit
-              ? MouseRegion(
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (question.imageUrl != null && question.imageUrl!.isNotEmpty)
+                AppQuestionImage(
+                  imageUrl: question.imageUrl,
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.cover,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              if (canEdit)
+                MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: () => _deleteQuestion(question.id),
                   ),
-                )
-              : null,
+                ),
+            ],
+          ),
         ),
       ),
     );

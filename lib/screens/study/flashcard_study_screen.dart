@@ -8,6 +8,7 @@ import '../../providers/quiz_provider.dart';
 import '../../models/question_model.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/responsive_layout.dart';
+import '../../widgets/app_question_image.dart';
 
 class FlashcardStudyScreen extends ConsumerStatefulWidget {
   final String quizId;
@@ -414,6 +415,7 @@ class _FlashcardStudyScreenState extends ConsumerState<FlashcardStudyScreen> {
                           title: 'Question',
                           content: currentQuestion.questionText,
                           hint: 'Tap to flip • Swipe to answer',
+                          imageUrl: currentQuestion.imageUrl,
                         ),
                         back: _buildCardSide(
                           context,
@@ -572,6 +574,7 @@ class _FlashcardStudyScreenState extends ConsumerState<FlashcardStudyScreen> {
     required String title,
     required String content,
     required String hint,
+    String? imageUrl,
   }) {
     final fontSize = _calculateFontSize(content);
 
@@ -614,7 +617,18 @@ class _FlashcardStudyScreenState extends ConsumerState<FlashcardStudyScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+
+          if (imageUrl != null && imageUrl.isNotEmpty) ...[
+            AppQuestionImage(
+              imageUrl: imageUrl,
+              height: 130,
+              width: double.infinity,
+              fit: BoxFit.contain,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // Scrollable Content Area with Auto-resizing Font
           Expanded(

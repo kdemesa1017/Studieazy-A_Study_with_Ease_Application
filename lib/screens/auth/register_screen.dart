@@ -876,6 +876,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                                 onTap: () {
                                   LegalPolicyDialog.show(
                                     context,
+                                    isMandatoryAcceptance: true,
                                     onAccept: () {
                                       setState(() => _agreedToPolicy = true);
                                     },

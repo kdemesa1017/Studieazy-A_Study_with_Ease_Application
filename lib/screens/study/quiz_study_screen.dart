@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/quiz_provider.dart';
 import '../../models/question_model.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/app_question_image.dart';
 
 class QuizStudyScreen extends ConsumerStatefulWidget {
   final String quizId;
@@ -505,13 +506,28 @@ class _QuizStudyScreenState extends ConsumerState<QuizStudyScreen> {
                       ),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(
-                      currentQuestion.questionText,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (currentQuestion.imageUrl != null && currentQuestion.imageUrl!.isNotEmpty) ...[
+                          AppQuestionImage(
+                            imageUrl: currentQuestion.imageUrl,
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.contain,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        Text(
+                          currentQuestion.questionText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 24),

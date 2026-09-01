@@ -84,6 +84,8 @@ class QuizService {
     required int correctAnswerIndex,
     bool isFlashcard = false,
     String? flashcardBack,
+    String questionType = 'mcq',
+    String? imageUrl,
   }) async {
     final question = QuestionModel(
       id: _uuid.v4(),
@@ -93,6 +95,8 @@ class QuizService {
       correctAnswerIndex: correctAnswerIndex,
       isFlashcard: isFlashcard,
       flashcardBack: flashcardBack,
+      questionType: questionType,
+      imageUrl: imageUrl,
       createdAt: DateTime.now(),
     );
 
@@ -108,7 +112,7 @@ class QuizService {
       );
       await _firestore.collection('quizzes').doc(quizId).update({
         'questionIds': updatedQuestionIds,
-        'lastModifiedAt': updatedQuiz.lastModifiedAt?.toIso8601String(),
+        'lastModifiedAt': updatedQuiz.lastModifiedAt!.toIso8601String(),
       });
     }
 
@@ -151,6 +155,8 @@ class QuizService {
     int? correctAnswerIndex,
     bool? isFlashcard,
     String? flashcardBack,
+    String? questionType,
+    String? imageUrl,
   }) async {
     final doc = await _firestore.collection('questions').doc(questionId).get();
     if (!doc.exists || doc.data() == null) return null;
@@ -162,6 +168,8 @@ class QuizService {
       correctAnswerIndex: correctAnswerIndex ?? question.correctAnswerIndex,
       isFlashcard: isFlashcard ?? question.isFlashcard,
       flashcardBack: flashcardBack ?? question.flashcardBack,
+      questionType: questionType ?? question.questionType,
+      imageUrl: imageUrl ?? question.imageUrl,
     );
 
     await _firestore.collection('questions').doc(questionId).update(updatedQuestion.toFirestore());

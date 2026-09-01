@@ -7,6 +7,7 @@ class QuestionModel {
   final bool isFlashcard;
   final String? flashcardBack;
   final String questionType; // 'mcq', 'flashcard', 'identification', 'enumeration'
+  final String? imageUrl;
   final DateTime createdAt;
 
   QuestionModel({
@@ -18,6 +19,7 @@ class QuestionModel {
     this.isFlashcard = false,
     this.flashcardBack,
     this.questionType = 'mcq',
+    this.imageUrl,
     required this.createdAt,
   });
 
@@ -73,6 +75,7 @@ class QuestionModel {
       'isFlashcard': isFlashcard,
       'flashcardBack': flashcardBack,
       'questionType': questionType,
+      if (imageUrl != null && imageUrl!.isNotEmpty) 'imageUrl': imageUrl,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -91,6 +94,7 @@ class QuestionModel {
       isFlashcard: rawIsFlashcard || rawType == 'flashcard',
       flashcardBack: data['flashcardBack'] as String?,
       questionType: rawType,
+      imageUrl: data['imageUrl'] as String?,
       createdAt: DateTime.parse(data['createdAt'] as String),
     );
   }
@@ -104,6 +108,7 @@ class QuestionModel {
     bool? isFlashcard,
     String? flashcardBack,
     String? questionType,
+    String? imageUrl,
     DateTime? createdAt,
   }) {
     return QuestionModel(
@@ -115,6 +120,7 @@ class QuestionModel {
       isFlashcard: isFlashcard ?? this.isFlashcard,
       flashcardBack: flashcardBack ?? this.flashcardBack,
       questionType: questionType ?? this.questionType,
+      imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,
     );
   }
